@@ -36,13 +36,6 @@ func TestValidateOrchestrator(t *testing.T) {
 			}),
 		},
 		{
-			name: "rejected on group-replication",
-			inst: instanceWithTopology(common.TopologyGroupReplication, map[string]corev1alpha1.ComponentSpec{
-				common.ComponentOrchestrator: {},
-			}),
-			wantErr: true,
-		},
-		{
 			name: "even size rejected",
 			inst: instanceWithTopology(common.TopologyAsync, map[string]corev1alpha1.ComponentSpec{
 				common.ComponentOrchestrator: {Replicas: ptr32(2)},
@@ -62,6 +55,12 @@ func TestValidateOrchestrator(t *testing.T) {
 				common.ComponentOrchestrator: {Type: "mysql"},
 			}),
 			wantErr: true,
+		},
+		{
+			name: "orchestrator on group-replication is ignored",
+			inst: instanceWithTopology(common.TopologyGroupReplication, map[string]corev1alpha1.ComponentSpec{
+				common.ComponentOrchestrator: {Replicas: ptr32(2)},
+			}),
 		},
 	}
 
@@ -181,6 +180,30 @@ func TestApplyOrchestrator(t *testing.T) {
 			t.Fatalf("default size: got %d", cr.Spec.Orchestrator.Size)
 		}
 	})
+
+	t.Run("group-replication ignores orchestrator component", func(t *testing.T) {
+		t.Parallel()
+		cr := &psv1.PerconaServerMySQL{}
+		inst := instanceWithTopology(common.TopologyGroupReplication, map[string]corev1alpha1.ComponentSpec{
+			common.ComponentOrchestrator: {
+				Replicas: ptr32(3),
+				Image:    "example/orchestrator:dev",
+			},
+		})
+		if err := applyOrchestrator(cr, inst, spec); err != nil {
+			t.Fatal(err)
+		}
+		if cr.Spec.Orchestrator.Enabled {
+			t.Fatal("orchestrator must be off on group-replication")
+		}
+		if cr.Spec.Unsafe.Orchestrator {
+			t.Fatal("unsafe flag is not used on group-replication")
+		}
+		if cr.Spec.Orchestrator.Image != "" || cr.Spec.Orchestrator.Size != 0 {
+			t.Fatal("orchestrator spec must not be mapped on group-replication")
+		}
+	})
+
 }
 
 func instanceWithTopology(topology string, components map[string]corev1alpha1.ComponentSpec) *corev1alpha1.Instance {

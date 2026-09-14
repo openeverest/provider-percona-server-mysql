@@ -12,18 +12,20 @@ import (
 
 const defaultOrchestratorSize int32 = 3
 
-// validateOrchestrator checks the optional orchestrator component.
-// Presence of spec.components.orchestrator is the enable flag; size/image/resources
-// come from the standard ComponentSpec fields, not from PodSpec.
+// validateOrchestrator mirrors the operator's OrchestratorEnabled() rules:
+//   - group-replication: orchestrator is ignored (never used)
+//   - async: the component may be omitted only because applyOrchestrator will
+//     set unsafeFlags.orchestrator; when present, size must be odd and >= 3
 func validateOrchestrator(inst *corev1alpha1.Instance) error {
+	if inst.GetTopologyType() == common.TopologyGroupReplication {
+		return nil
+	}
+
 	orch, enabled := inst.Spec.Components[common.ComponentOrchestrator]
 	if !enabled {
 		return nil
 	}
 
-	if inst.GetTopologyType() == common.TopologyGroupReplication {
-		return fmt.Errorf("%q is only supported on the %q topology", common.ComponentOrchestrator, common.TopologyAsync)
-	}
 	if orch.Type != "" && orch.Type != common.ComponentTypeOrchestrator {
 		return fmt.Errorf("%q component type must be %q", common.ComponentOrchestrator, common.ComponentTypeOrchestrator)
 	}
@@ -38,12 +40,26 @@ func validateOrchestrator(inst *corev1alpha1.Instance) error {
 	return nil
 }
 
-// applyOrchestrator maps Instance.spec.components.orchestrator onto the operator CR.
-// Disabled-on-async sets unsafeFlags.orchestrator so the operator accepts async
-// without Orchestrator. Image is resolved from the version catalog unless overridden.
+// applyOrchestrator maps Instance.spec.components.orchestrator onto the operator CR
+// the same way PerconaServerMySQL.OrchestratorEnabled() interprets the CR:
+//
+//	if GR: always off (component is ignored)
+//	if async && !unsafe.Orchestrator: always on
+//	else: Spec.Orchestrator.Enabled
+//
+// Omitting the component on async is how the Instance API requests disable, so
+// we set unsafeFlags.orchestrator. Image comes from the version catalog unless
+// the user overrides ComponentSpec.Image.
 func applyOrchestrator(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance, spec *corev1alpha1.ProviderSpec) error {
+	if inst.GetTopologyType() == common.TopologyGroupReplication {
+		cr.Spec.Orchestrator = psv1.OrchestratorSpec{Enabled: false}
+		cr.Spec.Unsafe.Orchestrator = false
+		return nil
+	}
+
 	orch, enabled := inst.Spec.Components[common.ComponentOrchestrator]
 	if !enabled {
+		// Async without orchestrator is only legal with the unsafe flag.
 		cr.Spec.Orchestrator = psv1.OrchestratorSpec{Enabled: false}
 		if inst.GetTopologyType() == common.TopologyAsync {
 			cr.Spec.Unsafe.Orchestrator = true
