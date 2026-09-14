@@ -13,6 +13,10 @@ config:
         engine:
             defaults:
                 replicas: 3
+        orchestrator:
+            optional: true
+            defaults:
+                replicas: 3
 ui:
     sections:
         basicInfo:

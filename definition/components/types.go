@@ -13,7 +13,7 @@ package components
 // beyond what the base Instance spec provides.
 type MysqlCustomSpec struct{}
 
-// OrchestratorCustomSpec defines custom configuration for orchestrator components.
-// Add fields here when the orchestrator component type needs custom configuration
-// beyond what the base Instance spec provides.
+// OrchestratorCustomSpec is intentionally empty. Enable/disable is the
+// presence of spec.components.orchestrator; image, replicas, resources,
+// affinity, and service are standard ComponentSpec fields mapped in Sync.
 type OrchestratorCustomSpec struct{}

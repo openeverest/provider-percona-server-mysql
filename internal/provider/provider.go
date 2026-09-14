@@ -48,11 +48,10 @@ func (p *Provider) Validate(c *controller.Context) error {
 	l := log.FromContext(c.Context())
 	l.Info("Validating instance", "name", c.Name())
 
-	// TODO: Implement validation logic.
-	// Examples:
-	//   - Check that required components are present
-	//   - Validate storage sizes, replica counts
-	//   - Ensure version compatibility
+	if err := validateOrchestrator(c.Instance()); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -64,20 +63,9 @@ func (p *Provider) Sync(c *controller.Context) error {
 	l := log.FromContext(c.Context())
 	l.Info("Syncing instance", "name", c.Name())
 
-	// TODO: Implement sync logic.
-	// Typical pattern:
-	//   1. Build the operator CR spec from the Instance spec
-	//   2. Use c.Apply() to create/update the operator resource
-	//
-	// Example:
-	//   cr := &operatorv1.MyDatabase{
-	//       ObjectMeta: metav1.ObjectMeta{
-	//           Name:      c.Name(),
-	//           Namespace: c.Namespace(),
-	//       },
-	//       Spec: buildSpec(c),
-	//   }
-	//   return c.Apply(cr)
+	// TODO: Build PerconaServerMySQL from the Instance spec and c.Apply() it.
+	// When that lands, call applyOrchestrator(cr, c.Instance(), spec) after
+	// resolving the ProviderSpec so optional orchestrator maps to the CR.
 	return nil
 }
 

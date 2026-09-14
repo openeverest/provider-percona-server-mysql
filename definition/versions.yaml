@@ -11,5 +11,5 @@ componentTypes:
     orchestrator:
         versions:
             - default: true
-              image: example/orchestrator:1.0.0
-              version: 1.0.0
+              image: percona/percona-orchestrator:3.2.6-22
+              version: 3.2.6-22

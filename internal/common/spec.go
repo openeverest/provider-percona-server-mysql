@@ -8,12 +8,11 @@ const (
 	// Provider CR, so a mismatch means nothing ever reconciles.
 	ProviderName = "percona-server-mysql"
 
-	// TODO: Define component names matching those in definition/provider.yaml.
-	// Example:
-	// ComponentEngine = "engine"
-
-	ComponentTypeMysql = "mysql"
-
+	ComponentEngine           = "engine"
+	ComponentTypeMysql        = "mysql"
 	ComponentOrchestrator     = "orchestrator"
 	ComponentTypeOrchestrator = "orchestrator"
+
+	TopologyAsync            = "async"
+	TopologyGroupReplication = "groupreplication"
 )
