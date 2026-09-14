@@ -7,3 +7,8 @@
 //
 // +k8s:openapi-gen=true
 package components
+
+// MysqlCustomSpec defines custom configuration for mysql components.
+// Add fields here when the mysql component type needs custom configuration
+// beyond what the base Instance spec provides.
+type MysqlCustomSpec struct{}

@@ -11,4 +11,6 @@ const (
 	// TODO: Define component names matching those in definition/provider.yaml.
 	// Example:
 	// ComponentEngine = "engine"
+
+	ComponentTypeMysql = "mysql"
 )
