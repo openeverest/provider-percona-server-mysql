@@ -13,4 +13,7 @@ const (
 	// ComponentEngine = "engine"
 
 	ComponentTypeMysql = "mysql"
+
+	ComponentOrchestrator     = "orchestrator"
+	ComponentTypeOrchestrator = "orchestrator"
 )

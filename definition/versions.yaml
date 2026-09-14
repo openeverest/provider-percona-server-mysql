@@ -8,3 +8,8 @@ componentTypes:
             - default: true
               image: example/mysql:1.0.0
               version: 1.0.0
+    orchestrator:
+        versions:
+            - default: true
+              image: example/orchestrator:1.0.0
+              version: 1.0.0

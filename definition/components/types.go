@@ -12,3 +12,8 @@ package components
 // Add fields here when the mysql component type needs custom configuration
 // beyond what the base Instance spec provides.
 type MysqlCustomSpec struct{}
+
+// OrchestratorCustomSpec defines custom configuration for orchestrator components.
+// Add fields here when the orchestrator component type needs custom configuration
+// beyond what the base Instance spec provides.
+type OrchestratorCustomSpec struct{}
