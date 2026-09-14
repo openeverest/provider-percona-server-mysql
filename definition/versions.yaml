@@ -13,3 +13,13 @@ componentTypes:
             - default: true
               image: percona/percona-orchestrator:3.2.6-22
               version: 3.2.6-22
+    haproxy:
+        versions:
+            - default: true
+              image: percona/haproxy:2.8.18-1
+              version: 2.8.18-1
+    router:
+        versions:
+            - default: true
+              image: percona/percona-mysql-router:8.4.10
+              version: 8.4.10

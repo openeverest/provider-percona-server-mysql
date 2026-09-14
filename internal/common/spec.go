@@ -12,6 +12,9 @@ const (
 	ComponentTypeMysql        = "mysql"
 	ComponentOrchestrator     = "orchestrator"
 	ComponentTypeOrchestrator = "orchestrator"
+	ComponentProxy            = "proxy"
+	ProxyTypeHAProxy          = "haproxy"
+	ProxyTypeRouter           = "router"
 
 	TopologyAsync            = "async"
 	TopologyGroupReplication = "groupreplication"

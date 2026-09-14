@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
-	"github.com/openeverest/openeverest/v2/provider-runtime/controller"
 	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
 
 	"github.com/openeverest/provider-percona-server-mysql/internal/common"
@@ -67,30 +66,14 @@ func applyOrchestrator(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance,
 		return nil
 	}
 
-	image := orchestratorImage(orch, spec)
+	image := imageForComponentType(spec, common.ComponentTypeOrchestrator, orch.Version, orch.Image)
 	if image == "" {
 		return fmt.Errorf("cannot resolve image for %q component", common.ComponentOrchestrator)
 	}
 
-	size := defaultOrchestratorSize
-	if orch.Replicas != nil {
-		size = *orch.Replicas
-	}
-
 	out := psv1.OrchestratorSpec{
 		Enabled: true,
-		PodSpec: psv1.PodSpec{
-			Size: size,
-			ContainerSpec: psv1.ContainerSpec{
-				Image: image,
-			},
-		},
-	}
-	if orch.Resources != nil {
-		out.Resources = *orch.Resources
-	}
-	if orch.Affinity != nil {
-		out.Affinity = &psv1.PodAffinity{Advanced: orch.Affinity}
+		PodSpec: componentPodSpec(orch, image, defaultOrchestratorSize),
 	}
 	if orch.Service != nil {
 		out.Expose = serviceExposeFromComponent(orch.Service)
@@ -99,33 +82,4 @@ func applyOrchestrator(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance,
 	cr.Spec.Orchestrator = out
 	cr.Spec.Unsafe.Orchestrator = false
 	return nil
-}
-
-func orchestratorImage(comp corev1alpha1.ComponentSpec, spec *corev1alpha1.ProviderSpec) string {
-	if comp.Image != "" {
-		return comp.Image
-	}
-	if spec == nil {
-		return ""
-	}
-	if comp.Version != "" {
-		if image := controller.GetImageForVersion(spec, common.ComponentOrchestrator, comp.Version); image != "" {
-			return image
-		}
-	}
-	return controller.GetDefaultImageForComponent(spec, common.ComponentOrchestrator)
-}
-
-func serviceExposeFromComponent(svc *corev1alpha1.Service) psv1.ServiceExpose {
-	expose := psv1.ServiceExpose{
-		Type:        svc.ServiceType,
-		Annotations: svc.Annotations,
-	}
-	if svc.LoadBalancerService != nil {
-		ranges := svc.LoadBalancerService.SourceRanges.NormalizedSourceRanges()
-		if len(ranges) > 0 {
-			expose.LoadBalancerSourceRanges = []string(ranges)
-		}
-	}
-	return expose
 }

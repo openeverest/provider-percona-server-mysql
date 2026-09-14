@@ -17,3 +17,11 @@ type MysqlCustomSpec struct{}
 // presence of spec.components.orchestrator; image, replicas, resources,
 // affinity, and service are standard ComponentSpec fields mapped in Sync.
 type OrchestratorCustomSpec struct{}
+
+// HaproxyCustomSpec is intentionally empty. Proxy size, image, resources,
+// affinity, and service are standard ComponentSpec fields.
+type HaproxyCustomSpec struct{}
+
+// RouterCustomSpec is intentionally empty. Proxy size, image, resources,
+// affinity, and service are standard ComponentSpec fields.
+type RouterCustomSpec struct{}

@@ -51,6 +51,9 @@ func (p *Provider) Validate(c *controller.Context) error {
 	if err := validateOrchestrator(c.Instance()); err != nil {
 		return err
 	}
+	if err := validateProxy(c.Instance()); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -64,8 +67,8 @@ func (p *Provider) Sync(c *controller.Context) error {
 	l.Info("Syncing instance", "name", c.Name())
 
 	// TODO: Build PerconaServerMySQL from the Instance spec and c.Apply() it.
-	// When that lands, call applyOrchestrator(cr, c.Instance(), spec) after
-	// resolving the ProviderSpec so optional orchestrator maps to the CR.
+	// When that lands, call applyOrchestrator and applyProxy after resolving
+	// the ProviderSpec.
 	return nil
 }
 

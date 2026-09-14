@@ -7,4 +7,6 @@ components:
         type: mysql
     orchestrator:
         type: orchestrator
+    proxy:
+        type: haproxy
 name: percona-server-mysql

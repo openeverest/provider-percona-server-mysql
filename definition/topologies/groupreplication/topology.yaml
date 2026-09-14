@@ -13,6 +13,11 @@ config:
         engine:
             defaults:
                 replicas: 3
+        proxy:
+            optional: true
+            defaults:
+                type: router
+                replicas: 2
 ui:
     sections:
         basicInfo:
