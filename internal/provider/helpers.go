@@ -3,7 +3,30 @@ package provider
 import (
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
 	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
+
+	"github.com/openeverest/provider-percona-server-mysql/internal/common"
 )
+
+// effectiveTopologyType returns the Instance's configured topology type, or
+// the provider's default topology when spec.topology is omitted entirely.
+// Group-replication is the default because it needs no orchestrator.
+func effectiveTopologyType(inst *corev1alpha1.Instance) string {
+	if t := inst.GetTopologyType(); t != "" {
+		return t
+	}
+	return common.TopologyGroupReplication
+}
+
+func mysqlSizeRequiresUnsafe(topology string, size int32) bool {
+	switch topology {
+	case common.TopologyAsync:
+		return size < psv1.MinSafeAsyncSize
+	case common.TopologyGroupReplication:
+		return size < psv1.MinSafeGRSize || size >= psv1.MaxSafeGRSize || size%2 == 0
+	default:
+		return false
+	}
+}
 
 func imageForComponentType(spec *corev1alpha1.ProviderSpec, componentType, version, override string) string {
 	if override != "" {
@@ -64,8 +87,14 @@ func componentPodSpec(comp corev1alpha1.ComponentSpec, image string, defaultSize
 	if comp.Resources != nil {
 		ps.Resources = *comp.Resources
 	}
-	if comp.Affinity != nil {
-		ps.Affinity = &psv1.PodAffinity{Advanced: comp.Affinity}
+	if sp := comp.SchedulingPolicy; sp != nil {
+		if sp.Affinity != nil {
+			ps.Affinity = &psv1.PodAffinity{Advanced: sp.Affinity}
+		}
+		ps.NodeSelector = sp.NodeSelector
+		ps.Tolerations = sp.Tolerations
+		ps.TopologySpreadConstraints = sp.TopologySpreadConstraints
+		ps.SchedulerName = sp.SchedulerName
 	}
 	return ps
 }

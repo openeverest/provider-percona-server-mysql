@@ -62,6 +62,11 @@ provider_build_env = os.getenv('PROVIDER_BUILD_ENV', 'CGO_ENABLED=0 GOOS=linux')
 # Initial admin password for the Everest UI/API.
 ui_admin_password = os.getenv('UI_ADMIN_PASSWORD', 'admin')
 
+# Percona Server for MySQL operator version whose CRDs match the API types
+# vendored in go.mod (github.com/percona/percona-server-mysql-operator). Keep
+# this in sync with go.mod when bumping the operator dependency.
+ps_operator_version = os.getenv('PS_OPERATOR_VERSION', '1.2.0')
+
 # ===========================
 # Paths
 # ===========================
@@ -171,16 +176,77 @@ docker_build_with_restart(
 )
 
 # ===========================
+# Provider: wait for core CRDs
+# ===========================
+# `helm_resource('openeverest', ...)` is considered done as soon as
+# `helm upgrade --install` for the core chart returns. That does NOT guarantee
+# the Provider CRD is Established and visible via API discovery yet — there is
+# a real-world lag between a CRD manifest being applied and it being
+# resolvable by kubectl/Helm. Without waiting for that explicitly, the
+# provider chart's `helm upgrade --install` can race ahead and fail with:
+#   "no matches for kind "Provider" in version "core.openeverest.io/v1alpha1""
+#   "ensure CRDs are installed first"
+# So we poll until the CRD is both Established and discoverable before letting
+# the provider Helm release apply.
+wait_provider_crd_deps = []
+if install_openeverest:
+    wait_provider_crd_deps = ['openeverest']
+
+local_resource(
+    'wait-provider-crd',
+    cmd='''
+set -eu
+timeout_secs="${WAIT_PROVIDER_CRD_TIMEOUT_SECS:-300}"
+deadline=$(( $(date +%s) + timeout_secs ))
+expected_crd="providers.core.openeverest.io"
+
+echo "Waiting for CRD ${expected_crd} (timeout ${timeout_secs}s)..."
+while [ "$(date +%s)" -lt "$deadline" ]; do
+  if kubectl get crd "$expected_crd" >/dev/null 2>&1; then
+    kubectl wait --for=condition=Established --timeout="${timeout_secs}s" "crd/${expected_crd}"
+    # API discovery can lag briefly after the CRD is established.
+    if kubectl api-resources --api-group=core.openeverest.io | grep -q '^providers[[:space:]]'; then
+      echo "Provider CRD is ready"
+      exit 0
+    fi
+  fi
+  sleep 2
+done
+
+echo "Timed out waiting for ${expected_crd}."
+if kubectl get crd | grep -q 'everest.percona.com'; then
+  echo "Detected CRDs from everest.percona.com, but this provider expects core.openeverest.io/v1alpha1."
+  echo "Use OpenEverest v2 core in this cluster or switch to a compatible provider build."
+fi
+exit 1
+''',
+    resource_deps=wait_provider_crd_deps,
+    labels=['provider'],
+)
+
+# ===========================
+# Provider: Percona Server for MySQL operator CRDs
+# ===========================
+# The provider watches PerconaServerMySQL (and friends), so its Kind source
+# can't start until these CRDs exist — without them you'd see:
+#   "no matches for kind \"PerconaServerMySQL\" in version \"ps.percona.com/v1\""
+# Applied with --server-side so re-running `tilt up` is a safe no-op.
+local_resource(
+    'install-ps-operator-crds',
+    'kubectl apply --server-side -f https://raw.githubusercontent.com/percona/percona-server-mysql-operator/v{0}/deploy/crd.yaml'.format(
+        ps_operator_version),
+    labels=['provider'],
+)
+
+# ===========================
 # Provider: Helm chart
 # ===========================
 # Deployed with a real `helm upgrade --install` (via the helm_resource
 # extension). Tilt injects the locally built image into the chart's
 # image.repository/image.tag values and live-updates the running pod. Using
 # helm_resource also guarantees the Provider CR is applied only after the core
-# CRDs exist.
-provider_resource_deps = ['provider-build']
-if install_openeverest:
-    provider_resource_deps = provider_resource_deps + ['openeverest']
+# CRDs exist and are discoverable (see wait-provider-crd above).
+provider_resource_deps = ['provider-build', 'wait-provider-crd', 'install-ps-operator-crds']
 
 helm_resource(
     'provider-percona-server-mysql',

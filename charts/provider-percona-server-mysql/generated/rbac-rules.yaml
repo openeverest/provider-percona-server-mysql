@@ -63,3 +63,15 @@
     - get
     - list
     - watch
+- apiGroups:
+    - ps.percona.com
+  resources:
+    - perconaservermysqls
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch

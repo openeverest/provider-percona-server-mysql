@@ -36,7 +36,7 @@ func validateProxy(inst *corev1alpha1.Instance) error {
 		return nil
 	}
 
-	topology := inst.GetTopologyType()
+	topology := effectiveTopologyType(inst)
 	proxyType := proxyTypeOf(proxy, topology)
 	switch proxyType {
 	case common.ProxyTypeHAProxy, common.ProxyTypeRouter:
@@ -71,14 +71,14 @@ func applyProxy(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance, spec *
 			HAProxy: &psv1.HAProxySpec{Enabled: false},
 			Router:  &psv1.MySQLRouterSpec{Enabled: false},
 		}
-		switch inst.GetTopologyType() {
+		switch effectiveTopologyType(inst) {
 		case common.TopologyAsync, common.TopologyGroupReplication:
 			cr.Spec.Unsafe.Proxy = true
 		}
 		return nil
 	}
 
-	topology := inst.GetTopologyType()
+	topology := effectiveTopologyType(inst)
 	proxyType := proxyTypeOf(proxy, topology)
 	image := imageForComponentType(spec, proxyType, proxy.Version, proxy.Image)
 	if image == "" {

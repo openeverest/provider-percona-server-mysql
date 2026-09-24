@@ -16,7 +16,7 @@ const defaultOrchestratorSize int32 = 3
 //   - async: the component may be omitted only because applyOrchestrator will
 //     set unsafeFlags.orchestrator; when present, size must be odd and >= 3
 func validateOrchestrator(inst *corev1alpha1.Instance) error {
-	if inst.GetTopologyType() == common.TopologyGroupReplication {
+	if effectiveTopologyType(inst) == common.TopologyGroupReplication {
 		return nil
 	}
 
@@ -50,7 +50,8 @@ func validateOrchestrator(inst *corev1alpha1.Instance) error {
 // we set unsafeFlags.orchestrator. Image comes from the version catalog unless
 // the user overrides ComponentSpec.Image.
 func applyOrchestrator(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance, spec *corev1alpha1.ProviderSpec) error {
-	if inst.GetTopologyType() == common.TopologyGroupReplication {
+	topology := effectiveTopologyType(inst)
+	if topology == common.TopologyGroupReplication {
 		cr.Spec.Orchestrator = psv1.OrchestratorSpec{Enabled: false}
 		cr.Spec.Unsafe.Orchestrator = false
 		return nil
@@ -60,7 +61,7 @@ func applyOrchestrator(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance,
 	if !enabled {
 		// Async without orchestrator is only legal with the unsafe flag.
 		cr.Spec.Orchestrator = psv1.OrchestratorSpec{Enabled: false}
-		if inst.GetTopologyType() == common.TopologyAsync {
+		if topology == common.TopologyAsync {
 			cr.Spec.Unsafe.Orchestrator = true
 		}
 		return nil

@@ -9,6 +9,11 @@ CONTAINER_TOOL ?= docker
 # OpenEverest branch to use for OpenEverest CRD installation.
 OPENEVEREST_BRANCH ?= main
 
+# Percona Server for MySQL operator version whose CRDs match the API types
+# vendored in go.mod (github.com/percona/percona-server-mysql-operator).
+# Keep this in sync with go.mod when bumping the operator dependency.
+PS_OPERATOR_VERSION ?= 1.2.0
+
 # Image URL to use for building/pushing image targets
 IMG ?= ghcr.io/openeverest/provider-percona-server-mysql-dev:latest
 
@@ -164,8 +169,8 @@ install-crds: ## Install OpenEverest CRDs (and your operator's CRDs) into the cl
 	kubectl apply -f https://raw.githubusercontent.com/openeverest/openeverest/$(OPENEVEREST_BRANCH)/config/crd/bases/backup.openeverest.io_backups.yaml
 	kubectl apply -f https://raw.githubusercontent.com/openeverest/openeverest/$(OPENEVEREST_BRANCH)/config/crd/bases/backup.openeverest.io_restores.yaml
 	kubectl apply -f https://raw.githubusercontent.com/openeverest/openeverest/$(OPENEVEREST_BRANCH)/config/crd/bases/backup.openeverest.io_backupstorages.yaml
-	# TODO: install your operator's CRDs, e.g.:
-	# curl -fsSL https://raw.githubusercontent.com/<org>/<operator>/v$(OPERATOR_VERSION)/deploy/crd.yaml | kubectl apply --server-side -f -
+	# Percona Server for MySQL operator CRDs, pinned to the version in go.mod.
+	kubectl apply --server-side -f https://raw.githubusercontent.com/percona/percona-server-mysql-operator/v$(PS_OPERATOR_VERSION)/deploy/crd.yaml
 
 .PHONY: deploy-provider-ci
 deploy-provider-ci: helm-deps ## Deploy the provider via Helm for CI (IMG must already be imported into k3d).

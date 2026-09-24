@@ -15,18 +15,7 @@ package provider
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // =============================================================================
-// PROVIDER-SPECIFIC RBAC — Add markers for your operator's resources.
+// PROVIDER-SPECIFIC RBAC
 // =============================================================================
-// Examples:
-//
-//   - Watch/manage operator CRs:
-//   // +kubebuilder:rbac:groups=ps.percona.com,resources=perconaservermysqls,verbs=get;list;watch;create;update;patch;delete
-//   // +kubebuilder:rbac:groups=ps.percona.com,resources=perconaservermysqls/status,verbs=get
-//   // +kubebuilder:rbac:groups=ps.percona.com,resources=perconaservermysqls/finalizers,verbs=update
-//
-//   - Access Kubernetes core resources:
-//   // +kubebuilder:rbac:groups="",resources=secrets;configmaps,verbs=get;list;watch
-//   // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
-//
-//   - Access PVCs (if managing storage):
-//   // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
+
+// +kubebuilder:rbac:groups=ps.percona.com,resources=perconaservermysqls,verbs=get;list;watch;create;update;patch;delete
