@@ -66,7 +66,6 @@ func (p *Provider) Validate(c *controller.Context) error {
 //
 // This is the main reconciliation logic. Create or update your
 // operator's custom resource(s) based on the Instance spec.
-
 func (p *Provider) Sync(c *controller.Context) error {
 	l := log.FromContext(c.Context())
 	l.Info("Syncing instance", "name", c.Name())
@@ -98,7 +97,6 @@ func (p *Provider) Sync(c *controller.Context) error {
 		Spec: psv1.PerconaServerMySQLSpec{
 			CRVersion: psversion.Version(),
 
-			// The operator requires these secrets by default.
 			SecretsName:    c.Name() + "-secrets",
 			SSLSecretName:  c.Name() + "-ssl",
 			UpdateStrategy: appsv1.RollingUpdateStatefulSetStrategyType,
@@ -164,12 +162,6 @@ func (p *Provider) Sync(c *controller.Context) error {
 		}
 	}
 
-	// Configure replication topology. The Instance's topology (async or
-	// group-replication) is declared explicitly via spec.topology.type and
-	// is the single source of truth — applyOrchestrator and applyProxy key
-	// off the same effective value (via effectiveTopologyType) so all three
-	// stay in sync. When omitted, the provider's default topology
-	// (group-replication, which needs no orchestrator) is used.
 	topologyType := effectiveTopologyType(c.Instance())
 
 	switch topologyType {
@@ -187,12 +179,10 @@ func (p *Provider) Sync(c *controller.Context) error {
 
 	cluster.Spec.MySQL.AutoRecovery = true
 
-	// Configure Orchestrator for asynchronous replication.
 	if err := applyOrchestrator(cluster, c.Instance(), providerSpec); err != nil {
 		return fmt.Errorf("apply orchestrator: %w", err)
 	}
 
-	// Configure the proxy.
 	if err := applyProxy(cluster, c.Instance(), providerSpec); err != nil {
 		return fmt.Errorf("apply proxy: %w", err)
 	}
@@ -244,9 +234,6 @@ func (p *Provider) Status(
 	}
 }
 
-// connectionDetails builds the connection details for a ready
-// PerconaServerMySQL cluster by reading the root user credentials from the
-// operator-managed secret.
 func connectionDetails(
 	c *controller.Context,
 	cluster *psv1.PerconaServerMySQL,

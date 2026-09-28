@@ -92,6 +92,11 @@ func TestApplyOrchestrator(t *testing.T) {
 					{Version: "3.2.6-21", Image: "percona/percona-orchestrator:3.2.6-21"},
 				},
 			},
+			common.ComponentTypeToolkit: {
+				Versions: []corev1alpha1.ComponentVersion{
+					{Version: "3.7.0", Image: "percona/percona-toolkit:3.7.0", Default: true},
+				},
+			},
 		},
 	}
 
@@ -108,6 +113,9 @@ func TestApplyOrchestrator(t *testing.T) {
 		if !cr.Spec.Unsafe.Orchestrator {
 			t.Fatal("expected unsafeFlags.orchestrator for async without orchestrator")
 		}
+		if cr.Spec.Toolkit != nil {
+			t.Fatal("toolkit must not be set when orchestrator is unsafely disabled")
+		}
 	})
 
 	t.Run("disabled on group-replication does not set unsafe flag", func(t *testing.T) {
@@ -119,6 +127,9 @@ func TestApplyOrchestrator(t *testing.T) {
 		}
 		if cr.Spec.Orchestrator.Enabled || cr.Spec.Unsafe.Orchestrator {
 			t.Fatal("orchestrator should stay off without unsafe flags")
+		}
+		if cr.Spec.Toolkit != nil {
+			t.Fatal("toolkit is never needed on group-replication")
 		}
 	})
 
@@ -162,6 +173,9 @@ func TestApplyOrchestrator(t *testing.T) {
 		if cr.Spec.Unsafe.Orchestrator {
 			t.Fatal("unsafe flag should be cleared when enabled")
 		}
+		if cr.Spec.Toolkit == nil || cr.Spec.Toolkit.Image != "percona/percona-toolkit:3.7.0" {
+			t.Fatalf("expected toolkit image to be resolved, got %+v", cr.Spec.Toolkit)
+		}
 	})
 
 	t.Run("explicit image override wins", func(t *testing.T) {
@@ -201,6 +215,29 @@ func TestApplyOrchestrator(t *testing.T) {
 		}
 		if cr.Spec.Orchestrator.Image != "" || cr.Spec.Orchestrator.Size != 0 {
 			t.Fatal("orchestrator spec must not be mapped on group-replication")
+		}
+		if cr.Spec.Toolkit != nil {
+			t.Fatal("toolkit is never needed on group-replication")
+		}
+	})
+
+	t.Run("missing toolkit catalog entry errors", func(t *testing.T) {
+		t.Parallel()
+		cr := &psv1.PerconaServerMySQL{}
+		specWithoutToolkit := &corev1alpha1.ProviderSpec{
+			Components: spec.Components,
+			ComponentTypes: map[string]corev1alpha1.ComponentType{
+				common.ComponentTypeOrchestrator: spec.ComponentTypes[common.ComponentTypeOrchestrator],
+			},
+		}
+		// Orchestrator enabled (component present) so toolkit resolution is
+		// actually exercised — omitting the component sets unsafeFlags.orchestrator,
+		// which skips toolkit entirely.
+		inst := instanceWithTopology(common.TopologyAsync, map[string]corev1alpha1.ComponentSpec{
+			common.ComponentOrchestrator: {},
+		})
+		if err := applyOrchestrator(cr, inst, specWithoutToolkit); err == nil {
+			t.Fatal("expected error when toolkit image cannot be resolved")
 		}
 	})
 

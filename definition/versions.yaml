@@ -64,6 +64,15 @@ componentTypes:
             - default: true
               image: percona/haproxy:2.8.18-1
               version: 2.8.18-1
+    # toolkit is not user-facing (no component in definition/provider.yaml
+    # references it): the operator requires spec.toolkit.image for the
+    # pt-heartbeat sidecar whenever async + orchestrator are both active, so
+    # the provider always resolves the default version below in that case.
+    toolkit:
+        versions:
+            - default: true
+              image: percona/percona-toolkit:3.7.0
+              version: 3.7.0
     router:
         versions:
             - image: percona/percona-mysql-router:8.0.46-37.1

@@ -40,6 +40,11 @@ spec:
         - default: true
           image: percona/percona-mysql-router:8.4.10-10.1
           version: 8.4.10-10.1
+    toolkit:
+      versions:
+        - default: true
+          image: percona/percona-toolkit:3.7.0
+          version: 3.7.0
   components:
     engine:
       type: mysql

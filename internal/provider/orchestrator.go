@@ -54,6 +54,7 @@ func applyOrchestrator(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance,
 	if topology == common.TopologyGroupReplication {
 		cr.Spec.Orchestrator = psv1.OrchestratorSpec{Enabled: false}
 		cr.Spec.Unsafe.Orchestrator = false
+		cr.Spec.Toolkit = nil
 		return nil
 	}
 
@@ -64,7 +65,7 @@ func applyOrchestrator(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance,
 		if topology == common.TopologyAsync {
 			cr.Spec.Unsafe.Orchestrator = true
 		}
-		return nil
+		return applyToolkit(cr, spec, topology)
 	}
 
 	image := imageForComponentType(spec, common.ComponentTypeOrchestrator, orch.Version, orch.Image)
@@ -82,5 +83,22 @@ func applyOrchestrator(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance,
 
 	cr.Spec.Orchestrator = out
 	cr.Spec.Unsafe.Orchestrator = false
+	return applyToolkit(cr, spec, topology)
+}
+
+func applyToolkit(cr *psv1.PerconaServerMySQL, spec *corev1alpha1.ProviderSpec, topology string) error {
+	if topology != common.TopologyAsync || cr.Spec.Unsafe.Orchestrator {
+		cr.Spec.Toolkit = nil
+		return nil
+	}
+
+	image := imageForComponentType(spec, common.ComponentTypeToolkit, "", "")
+	if image == "" {
+		return fmt.Errorf("cannot resolve image for %q component", common.ComponentTypeToolkit)
+	}
+
+	cr.Spec.Toolkit = &psv1.ToolkitSpec{
+		ContainerSpec: psv1.ContainerSpec{Image: image},
+	}
 	return nil
 }

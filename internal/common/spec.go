@@ -12,6 +12,7 @@ const (
 	ComponentTypeMysql        = "mysql"
 	ComponentOrchestrator     = "orchestrator"
 	ComponentTypeOrchestrator = "orchestrator"
+	ComponentTypeToolkit      = "toolkit"
 	ComponentProxy            = "proxy"
 	ProxyTypeHAProxy          = "haproxy"
 	ProxyTypeRouter           = "router"
