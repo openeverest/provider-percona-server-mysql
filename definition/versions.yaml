@@ -2,6 +2,36 @@
 # Add new versions here when operator releases are available.
 # Mark exactly one version per type as `default: true`.
 
+versions:
+    - components:
+        engine: 8.0.40-31
+      name: 8.0.40-31
+    - components:
+        engine: 8.0.42-33
+      name: 8.0.42-33
+    - components:
+        engine: 8.0.43-34.1
+      name: 8.0.43-34.1
+    - components:
+        engine: 8.0.45-36.1
+      name: 8.0.45-36.1
+    - components:
+        engine: 8.0.46-37.1
+      name: 8.0.46-37.1
+    - components:
+        engine: 8.4.5-5
+      name: 8.4.5-5
+    - components:
+        engine: 8.4.6-6.1
+      name: 8.4.6-6.1
+    - components:
+        engine: 8.4.8-8.1
+      name: 8.4.8-8.1
+    - components:
+        engine: 8.4.10-10.1
+      default: true
+      name: 8.4.10-10.1
+
 componentTypes:
     mysql:
         versions:
