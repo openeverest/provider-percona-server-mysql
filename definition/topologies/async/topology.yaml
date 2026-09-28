@@ -24,15 +24,26 @@ config:
                 replicas: 2
 ui:
     sections:
-        basicInfo:
-            components:
-                version:
-                    fieldParams:
-                        label: Database Version
-                    path: spec.components.engine.version
-                    uiType: select
-            description: Provide the basic information for your new database.
-            label: Basic Information
+        databaseVersion:
+          components:
+            version:
+              fieldParams:
+                label: Database Version
+                optionsPath: spec.versions
+                optionsPathConfig:
+                  labelPath: name
+                  valuePath: name
+                modes:
+                  edit:
+                    disabled: true
+                  restore:
+                    disabled: true
+              path: spec.version
+              uiType: select
+              validation:
+                required: true
+          description: Provide the database version for your new database.
+          label: Database Version
         resources:
           components:
             numberOfNodes:
@@ -202,7 +213,7 @@ ui:
             - proxyLimits
             - proxyRequests
     sectionsOrder:
-        - basicInfo
+        - databaseVersion
         - resources
         - orchestrator
         - proxy
