@@ -46,9 +46,11 @@ func imageForComponentType(spec *corev1alpha1.ProviderSpec, componentType, versi
 			}
 		}
 	}
-	for _, v := range ct.Versions {
-		if v.Default && v.Image != "" {
-			return v.Image
+	if ct.DefaultVersion != "" {
+		for _, v := range ct.Versions {
+			if v.Version == ct.DefaultVersion && v.Image != "" {
+				return v.Image
+			}
 		}
 	}
 	for _, v := range ct.Versions {

@@ -87,14 +87,16 @@ func TestApplyOrchestrator(t *testing.T) {
 		},
 		ComponentTypes: map[string]corev1alpha1.ComponentType{
 			common.ComponentTypeOrchestrator: {
+				DefaultVersion: "3.2.6-22",
 				Versions: []corev1alpha1.ComponentVersion{
-					{Version: "3.2.6-22", Image: "percona/percona-orchestrator:3.2.6-22", Default: true},
+					{Version: "3.2.6-22", Image: "percona/percona-orchestrator:3.2.6-22"},
 					{Version: "3.2.6-21", Image: "percona/percona-orchestrator:3.2.6-21"},
 				},
 			},
 			common.ComponentTypeToolkit: {
+				DefaultVersion: "3.7.0",
 				Versions: []corev1alpha1.ComponentVersion{
-					{Version: "3.7.0", Image: "percona/percona-toolkit:3.7.0", Default: true},
+					{Version: "3.7.0", Image: "percona/percona-toolkit:3.7.0"},
 				},
 			},
 		},

@@ -92,13 +92,15 @@ func TestApplyProxy(t *testing.T) {
 		},
 		ComponentTypes: map[string]corev1alpha1.ComponentType{
 			common.ProxyTypeHAProxy: {
+				DefaultVersion: "2.8.18-1",
 				Versions: []corev1alpha1.ComponentVersion{
-					{Version: "2.8.18-1", Image: "percona/haproxy:2.8.18-1", Default: true},
+					{Version: "2.8.18-1", Image: "percona/haproxy:2.8.18-1"},
 				},
 			},
 			common.ProxyTypeRouter: {
+				DefaultVersion: "8.4.10",
 				Versions: []corev1alpha1.ComponentVersion{
-					{Version: "8.4.10", Image: "percona/percona-mysql-router:8.4.10", Default: true},
+					{Version: "8.4.10", Image: "percona/percona-mysql-router:8.4.10"},
 				},
 			},
 		},

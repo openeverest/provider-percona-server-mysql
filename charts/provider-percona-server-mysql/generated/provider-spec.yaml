@@ -3,11 +3,12 @@
 spec:
   componentTypes:
     haproxy:
+      defaultVersion: 2.8.18-1
       versions:
-        - default: true
-          image: percona/haproxy:2.8.18-1
+        - image: percona/haproxy:2.8.18-1
           version: 2.8.18-1
     mysql:
+      defaultVersion: 8.4.10-10.1
       versions:
         - image: percona/percona-server:8.0.40-31
           version: 8.0.40-31
@@ -25,25 +26,24 @@ spec:
           version: 8.4.6-6.1
         - image: percona/percona-server:8.4.8-8.1
           version: 8.4.8-8.1
-        - default: true
-          image: percona/percona-server:8.4.10-10.1
+        - image: percona/percona-server:8.4.10-10.1
           version: 8.4.10-10.1
     orchestrator:
+      defaultVersion: 3.2.6-22
       versions:
-        - default: true
-          image: percona/percona-orchestrator:3.2.6-22
+        - image: percona/percona-orchestrator:3.2.6-22
           version: 3.2.6-22
     router:
+      defaultVersion: 8.4.10-10.1
       versions:
         - image: percona/percona-mysql-router:8.0.46-37.1
           version: 8.0.46-37.1
-        - default: true
-          image: percona/percona-mysql-router:8.4.10-10.1
+        - image: percona/percona-mysql-router:8.4.10-10.1
           version: 8.4.10-10.1
     toolkit:
+      defaultVersion: 3.7.0
       versions:
-        - default: true
-          image: percona/percona-toolkit:3.7.0
+        - image: percona/percona-toolkit:3.7.0
           version: 3.7.0
   components:
     engine:
@@ -52,6 +52,9 @@ spec:
       type: orchestrator
     proxy:
       type: haproxy
+  defaultVersion: 8.4.10-10.1
+  release:
+    version: 0.1.0
   topologies:
     async:
       components:
@@ -468,5 +471,4 @@ spec:
       name: 8.4.8-8.1
     - components:
         engine: 8.4.10-10.1
-      default: true
       name: 8.4.10-10.1
