@@ -14,7 +14,11 @@ const defaultOrchestratorSize int32 = 3
 // validateOrchestrator mirrors the operator's OrchestratorEnabled() rules:
 //   - group-replication: orchestrator is ignored (never used)
 //   - async: the component may be omitted only because applyOrchestrator will
-//     set unsafeFlags.orchestrator; when present, size must be odd and >= 3
+//     set unsafeFlags.orchestrator; when present, size must be >= 1.
+//
+// Sizes below the operator's safe range (odd, >= 3) are not rejected here:
+// applyOrchestrator sets unsafeFlags.orchestratorSize so the operator accepts
+// them, mirroring how mysqlSizeRequiresUnsafe handles MySQL sizing.
 func validateOrchestrator(inst *corev1alpha1.Instance) error {
 	if effectiveTopologyType(inst) == common.TopologyGroupReplication {
 		return nil
@@ -28,13 +32,8 @@ func validateOrchestrator(inst *corev1alpha1.Instance) error {
 	if orch.Type != "" && orch.Type != common.ComponentTypeOrchestrator {
 		return fmt.Errorf("%q component type must be %q", common.ComponentOrchestrator, common.ComponentTypeOrchestrator)
 	}
-	if orch.Replicas != nil {
-		if *orch.Replicas < 1 {
-			return fmt.Errorf("%q replicas must be >= 1", common.ComponentOrchestrator)
-		}
-		if *orch.Replicas < 3 || *orch.Replicas%2 == 0 {
-			return fmt.Errorf("%q replicas must be odd and >= 3 (got %d)", common.ComponentOrchestrator, *orch.Replicas)
-		}
+	if orch.Replicas != nil && *orch.Replicas < 1 {
+		return fmt.Errorf("%q replicas must be >= 1", common.ComponentOrchestrator)
 	}
 	return nil
 }
@@ -83,6 +82,7 @@ func applyOrchestrator(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance,
 
 	cr.Spec.Orchestrator = out
 	cr.Spec.Unsafe.Orchestrator = false
+	cr.Spec.Unsafe.OrchestratorSize = orchestratorSizeRequiresUnsafe(out.Size)
 	return applyToolkit(cr, spec, topology)
 }
 

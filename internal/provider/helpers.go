@@ -28,6 +28,25 @@ func mysqlSizeRequiresUnsafe(topology string, size int32) bool {
 	}
 }
 
+// orchestratorSizeRequiresUnsafe reports whether an enabled orchestrator's
+// size falls outside the operator's safe range for async replication: the
+// operator requires the size to be odd and >= 3 (psv1.MinSafeGRSize) unless
+// unsafeFlags.orchestratorSize is set.
+func orchestratorSizeRequiresUnsafe(size int32) bool {
+	return size < psv1.MinSafeGRSize || size%2 == 0
+}
+
+// proxySizeRequiresUnsafe reports whether an enabled MySQL Router's size
+// falls below the operator's safe minimum for group-replication
+// (psv1.MinSafeProxySize) unless unsafeFlags.proxySize is set. HAProxy has
+// no equivalent minimum in the operator, so it always returns false.
+func proxySizeRequiresUnsafe(proxyType string, size int32) bool {
+	if proxyType != common.ProxyTypeRouter {
+		return false
+	}
+	return size < psv1.MinSafeProxySize
+}
+
 func imageForComponentType(spec *corev1alpha1.ProviderSpec, componentType, version, override string) string {
 	if override != "" {
 		return override

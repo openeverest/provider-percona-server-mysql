@@ -27,9 +27,12 @@ func proxyTypeOf(comp corev1alpha1.ComponentSpec, topology string) string {
 
 // validateProxy enforces operator proxy rules:
 //   - async: only haproxy
-//   - group-replication: haproxy or router (router size >= 2)
+//   - group-replication: haproxy or router
 //
 // Omitting the component is allowed; applyProxy sets unsafeFlags.proxy.
+// Router sizes below the operator's safe minimum on group-replication are
+// not rejected here: applyProxy sets unsafeFlags.proxySize so the operator
+// accepts them, mirroring how mysqlSizeRequiresUnsafe handles MySQL sizing.
 func validateProxy(inst *corev1alpha1.Instance) error {
 	proxy, enabled := inst.Spec.Components[common.ComponentProxy]
 	if !enabled {
@@ -48,15 +51,6 @@ func validateProxy(inst *corev1alpha1.Instance) error {
 	}
 	if proxy.Replicas != nil && *proxy.Replicas < 1 {
 		return fmt.Errorf("%q replicas must be >= 1", common.ComponentProxy)
-	}
-	if topology == common.TopologyGroupReplication && proxyType == common.ProxyTypeRouter {
-		size := defaultProxySize
-		if proxy.Replicas != nil {
-			size = *proxy.Replicas
-		}
-		if size < psv1.MinSafeProxySize {
-			return fmt.Errorf("%q router replicas must be >= %d on %q", common.ComponentProxy, psv1.MinSafeProxySize, common.TopologyGroupReplication)
-		}
 	}
 	return nil
 }
@@ -102,5 +96,6 @@ func applyProxy(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance, spec *
 	default:
 		return fmt.Errorf("unsupported proxy type %q", proxyType)
 	}
+	cr.Spec.Unsafe.ProxySize = proxySizeRequiresUnsafe(proxyType, pod.Size)
 	return nil
 }

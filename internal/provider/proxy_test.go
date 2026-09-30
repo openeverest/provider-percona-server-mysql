@@ -54,9 +54,15 @@ func TestValidateProxy(t *testing.T) {
 			}),
 		},
 		{
-			name: "router size 1 on group-replication rejected",
+			name: "router size 1 on group-replication is not rejected (unsafe flag handles it)",
 			inst: instanceWithTopology(common.TopologyGroupReplication, map[string]corev1alpha1.ComponentSpec{
 				common.ComponentProxy: {Type: common.ProxyTypeRouter, Replicas: ptr32(1)},
+			}),
+		},
+		{
+			name: "proxy size 0 rejected",
+			inst: instanceWithTopology(common.TopologyGroupReplication, map[string]corev1alpha1.ComponentSpec{
+				common.ComponentProxy: {Type: common.ProxyTypeRouter, Replicas: ptr32(0)},
 			}),
 			wantErr: true,
 		},
@@ -188,6 +194,48 @@ func TestApplyProxy(t *testing.T) {
 		}
 		if !cr.Spec.Proxy.Router.Enabled || cr.Spec.Proxy.HAProxy.Enabled {
 			t.Fatal("expected router default on group-replication")
+		}
+	})
+
+	t.Run("undersized router sets unsafeFlags.proxySize", func(t *testing.T) {
+		t.Parallel()
+		cr := &psv1.PerconaServerMySQL{}
+		inst := instanceWithTopology(common.TopologyGroupReplication, map[string]corev1alpha1.ComponentSpec{
+			common.ComponentProxy: {Type: common.ProxyTypeRouter, Replicas: ptr32(1)},
+		})
+		if err := applyProxy(cr, inst, spec); err != nil {
+			t.Fatal(err)
+		}
+		if !cr.Spec.Unsafe.ProxySize {
+			t.Fatal("expected unsafeFlags.proxySize to be set for router size below minimum")
+		}
+	})
+
+	t.Run("safe router size clears unsafeFlags.proxySize", func(t *testing.T) {
+		t.Parallel()
+		cr := &psv1.PerconaServerMySQL{}
+		inst := instanceWithTopology(common.TopologyGroupReplication, map[string]corev1alpha1.ComponentSpec{
+			common.ComponentProxy: {Type: common.ProxyTypeRouter, Replicas: ptr32(2)},
+		})
+		if err := applyProxy(cr, inst, spec); err != nil {
+			t.Fatal(err)
+		}
+		if cr.Spec.Unsafe.ProxySize {
+			t.Fatal("expected unsafeFlags.proxySize to be cleared for a safe router size")
+		}
+	})
+
+	t.Run("haproxy never sets unsafeFlags.proxySize", func(t *testing.T) {
+		t.Parallel()
+		cr := &psv1.PerconaServerMySQL{}
+		inst := instanceWithTopology(common.TopologyAsync, map[string]corev1alpha1.ComponentSpec{
+			common.ComponentProxy: {Type: common.ProxyTypeHAProxy, Replicas: ptr32(1)},
+		})
+		if err := applyProxy(cr, inst, spec); err != nil {
+			t.Fatal(err)
+		}
+		if cr.Spec.Unsafe.ProxySize {
+			t.Fatal("haproxy has no minimum size in the operator; unsafeFlags.proxySize must stay false")
 		}
 	})
 }
