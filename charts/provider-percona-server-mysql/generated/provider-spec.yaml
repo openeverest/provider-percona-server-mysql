@@ -5,6 +5,8 @@ spec:
     backup:
       defaultVersion: 8.4.0-6.1
       versions:
+        - image: percona/percona-xtrabackup:8.0.35-36.1
+          version: 8.0.35-36.1
         - image: percona/percona-xtrabackup:8.4.0-6.1
           version: 8.4.0-6.1
     haproxy:
@@ -453,23 +455,23 @@ spec:
         - proxy
   versions:
     - components:
-        backup: 8.4.0-6.1
+        backup: 8.0.35-36.1
         engine: 8.0.40-31
       name: 8.0.40-31
     - components:
-        backup: 8.4.0-6.1
+        backup: 8.0.35-36.1
         engine: 8.0.42-33
       name: 8.0.42-33
     - components:
-        backup: 8.4.0-6.1
+        backup: 8.0.35-36.1
         engine: 8.0.43-34.1
       name: 8.0.43-34.1
     - components:
-        backup: 8.4.0-6.1
+        backup: 8.0.35-36.1
         engine: 8.0.45-36.1
       name: 8.0.45-36.1
     - components:
-        backup: 8.4.0-6.1
+        backup: 8.0.35-36.1
         engine: 8.0.46-37.1
       name: 8.0.46-37.1
     - components:

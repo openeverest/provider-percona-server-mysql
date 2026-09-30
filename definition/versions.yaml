@@ -6,23 +6,23 @@ defaultVersion: 8.4.10-10.1
 versions:
     - components:
         engine: 8.0.40-31
-        backup: 8.4.0-6.1
+        backup: 8.0.35-36.1
       name: 8.0.40-31
     - components:
         engine: 8.0.42-33
-        backup: 8.4.0-6.1
+        backup: 8.0.35-36.1
       name: 8.0.42-33
     - components:
         engine: 8.0.43-34.1
-        backup: 8.4.0-6.1
+        backup: 8.0.35-36.1
       name: 8.0.43-34.1
     - components:
         engine: 8.0.45-36.1
-        backup: 8.4.0-6.1
+        backup: 8.0.35-36.1
       name: 8.0.45-36.1
     - components:
         engine: 8.0.46-37.1
-        backup: 8.4.0-6.1
+        backup: 8.0.35-36.1
       name: 8.0.46-37.1
     - components:
         engine: 8.4.5-5
@@ -91,11 +91,16 @@ componentTypes:
               version: 8.4.10-10.1
     # backup is not a user-facing component (no component in
     # definition/provider.yaml references it): it resolves the xtrabackup
-    # image used by PerconaServerMySQLBackup/-Restore resources, mirroring
-    # how the operator's own deploy/cr.yaml pins a single xtrabackup image
-    # regardless of the selected MySQL engine version.
+    # image used by PerconaServerMySQLBackup/-Restore resources. Unlike most
+    # component types, xtrabackup is *not* interchangeable across MySQL major
+    # versions (xtrabackup 8.4.x refuses to back up Percona Server 8.0.x and
+    # vice versa), so each `versions[].components.backup` entry above must be
+    # paired with the xtrabackup build matching that entry's `engine` major
+    # version, and both builds must be listed here.
     backup:
         defaultVersion: 8.4.0-6.1
         versions:
+            - image: percona/percona-xtrabackup:8.0.35-36.1
+              version: 8.0.35-36.1
             - image: percona/percona-xtrabackup:8.4.0-6.1
               version: 8.4.0-6.1
