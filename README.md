@@ -98,9 +98,8 @@ helm install provider-percona-server-mysql \
   --namespace everest-system
 ```
 
-<!-- TODO(provider): keep whichever of the two bullets below is true, delete the other. -->
-- The operator is bundled as a chart dependency and is installed automatically.
-- The operator is **not** bundled — install it before installing this provider.
+The operator is bundled as a chart dependency (`ps-operator`, configured with
+`watchAllNamespaces: true`) and is installed automatically.
 
 Upgrade and uninstall:
 

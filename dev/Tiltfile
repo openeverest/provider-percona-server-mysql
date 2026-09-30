@@ -62,11 +62,6 @@ provider_build_env = os.getenv('PROVIDER_BUILD_ENV', 'CGO_ENABLED=0 GOOS=linux')
 # Initial admin password for the Everest UI/API.
 ui_admin_password = os.getenv('UI_ADMIN_PASSWORD', 'admin')
 
-# Percona Server for MySQL operator version whose CRDs match the API types
-# vendored in go.mod (github.com/percona/percona-server-mysql-operator). Keep
-# this in sync with go.mod when bumping the operator dependency.
-ps_operator_version = os.getenv('PS_OPERATOR_VERSION', '1.2.0')
-
 # ===========================
 # Paths
 # ===========================
@@ -137,6 +132,16 @@ local_resource(
     'provider-generate',
     'make -C {0} generate'.format(provider_dir),
     deps=['{0}/definition'.format(provider_dir)],
+    labels=['provider'],
+)
+
+local_resource(
+    'provider-helm-deps',
+    cmd='helm dependency build {0}'.format(chart_dir),
+    deps=[
+        '{0}/Chart.yaml'.format(chart_dir),
+        '{0}/values.yaml'.format(chart_dir),
+    ],
     labels=['provider'],
 )
 
@@ -225,20 +230,6 @@ exit 1
 )
 
 # ===========================
-# Provider: Percona Server for MySQL operator CRDs
-# ===========================
-# The provider watches PerconaServerMySQL (and friends), so its Kind source
-# can't start until these CRDs exist — without them you'd see:
-#   "no matches for kind \"PerconaServerMySQL\" in version \"ps.percona.com/v1\""
-# Applied with --server-side so re-running `tilt up` is a safe no-op.
-local_resource(
-    'install-ps-operator-crds',
-    'kubectl apply --server-side -f https://raw.githubusercontent.com/percona/percona-server-mysql-operator/v{0}/deploy/crd.yaml'.format(
-        ps_operator_version),
-    labels=['provider'],
-)
-
-# ===========================
 # Provider: Helm chart
 # ===========================
 # Deployed with a real `helm upgrade --install` (via the helm_resource
@@ -246,7 +237,14 @@ local_resource(
 # image.repository/image.tag values and live-updates the running pod. Using
 # helm_resource also guarantees the Provider CR is applied only after the core
 # CRDs exist and are discoverable (see wait-provider-crd above).
-provider_resource_deps = ['provider-build', 'wait-provider-crd', 'install-ps-operator-crds']
+#
+# The Percona Server for MySQL operator is installed as this chart's
+# "ps-operator" dependency (see Chart.yaml/values.yaml), configured with
+# watchAllNamespaces: true — matching the PSMDB/PXC providers — so it
+# reconciles PerconaServerMySQL CRs regardless of which namespace the
+# Instance (and its CR) was created in. `provider-helm-deps` (helm dependency
+# build) fetches/refreshes that subchart before the release is installed.
+provider_resource_deps = ['provider-build', 'provider-helm-deps', 'wait-provider-crd']
 
 helm_resource(
     'provider-percona-server-mysql',

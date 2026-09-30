@@ -163,8 +163,7 @@ leaderElection:
   # -- Enable leader election (recommended for HA deployments)
   enabled: true
 
-# TODO: Add values for your operator subchart dependency, e.g.:
-# my-operator:
-#   replicaCount: 1
-#   rbac:
-#     create: true
+ps-operator:
+  enabled: true
+  # -- Watch Instances in all namespaces, matching PSMDB/PXC providers
+  watchAllNamespaces: true
