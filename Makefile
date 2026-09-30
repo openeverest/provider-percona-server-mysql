@@ -24,8 +24,9 @@ OPENEVEREST_CONTROLLER_IMG ?= ghcr.io/openeverest/openeverest-controller-dev:0.0
 _IMG_REPO = $(firstword $(subst :, ,$(IMG)))
 _IMG_TAG  = $(lastword $(subst :, ,$(IMG)))
 
-# k3d cluster name (must match dev/k3d_config.yaml metadata.name)
-K3D_CLUSTER_NAME ?= provider-percona-server-mysql-test
+# k3d cluster name (must match dev/k3d_config.yaml metadata.name; k3d/k3s
+# requires <= 32 characters)
+K3D_CLUSTER_NAME ?= provider-ps-mysql-test
 
 # controller-gen version
 CONTROLLER_TOOLS_VERSION ?= v0.18.0
