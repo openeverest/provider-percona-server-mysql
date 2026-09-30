@@ -17,6 +17,11 @@ const (
 	ProxyTypeHAProxy          = "haproxy"
 	ProxyTypeRouter           = "router"
 
+	// ComponentBackup is the component type key used in the version catalog
+	// (definition/versions.yaml) for the xtrabackup image used to run
+	// backups and restores.
+	ComponentBackup = "backup"
+
 	TopologyAsync            = "async"
 	TopologyGroupReplication = "groupreplication"
 )

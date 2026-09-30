@@ -2,6 +2,11 @@
 # Do not edit manually. Run `make generate` to update.
 spec:
   componentTypes:
+    backup:
+      defaultVersion: 8.4.0-6.1
+      versions:
+        - image: percona/percona-xtrabackup:8.4.0-6.1
+          version: 8.4.0-6.1
     haproxy:
       defaultVersion: 2.8.18-1
       versions:
@@ -46,6 +51,8 @@ spec:
         - image: percona/percona-toolkit:3.7.0
           version: 3.7.0
   components:
+    backup:
+      type: backup
     engine:
       type: mysql
     orchestrator:
@@ -446,29 +453,38 @@ spec:
         - proxy
   versions:
     - components:
+        backup: 8.4.0-6.1
         engine: 8.0.40-31
       name: 8.0.40-31
     - components:
+        backup: 8.4.0-6.1
         engine: 8.0.42-33
       name: 8.0.42-33
     - components:
+        backup: 8.4.0-6.1
         engine: 8.0.43-34.1
       name: 8.0.43-34.1
     - components:
+        backup: 8.4.0-6.1
         engine: 8.0.45-36.1
       name: 8.0.45-36.1
     - components:
+        backup: 8.4.0-6.1
         engine: 8.0.46-37.1
       name: 8.0.46-37.1
     - components:
+        backup: 8.4.0-6.1
         engine: 8.4.5-5
       name: 8.4.5-5
     - components:
+        backup: 8.4.0-6.1
         engine: 8.4.6-6.1
       name: 8.4.6-6.1
     - components:
+        backup: 8.4.0-6.1
         engine: 8.4.8-8.1
       name: 8.4.8-8.1
     - components:
+        backup: 8.4.0-6.1
         engine: 8.4.10-10.1
       name: 8.4.10-10.1
