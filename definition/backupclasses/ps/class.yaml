@@ -1,0 +1,35 @@
+# Ps BackupClass definition.
+# This file is the source of truth for the generated BackupClass manifest.
+#
+# Fields:
+#   displayName/description: human-readable metadata.
+#   supportedProviders: providers this class can be used with.
+#   executionMode: "ProviderManaged" (operator-native) or "Job".
+#   providerManaged.supportsPITR: advertise PITR capability to Restore validation.
+#   providerManaged.limits: caps the runtime enforces against Instance.spec.backup.
+#     maxStorages, maxPITREnabledStorages, maxSchedulesPerStorage — unset means unlimited.
+#   providerManaged.pitrParametersSchema.openAPIV3Schema: Go type name (in this
+#     package) describing per-storage PITR parameters. Resolved to an OpenAPI
+#     schema at generation time.
+#   parametersSchema.openAPIV3Schema / restoreParametersSchema.openAPIV3Schema:
+#     Go type names describing backup-time and restore-time parameters respectively.
+#
+# Co-located files:
+#   ui.yaml  — free-form UI rendering hints, inlined verbatim under spec.uiSchema.
+#   types.go — Go types referenced above; OpenAPI-extracted by provider-sdk generate.
+
+description: 'BackupClass for Percona Server for MySQL Operator. OpenEverest does not run any side-car Job for this class.
+  Supports full and incremental backup types.'
+displayName: Percona Backup for Percona Server for MySQL Operator
+executionMode: ProviderManaged
+parametersSchema:
+    openAPIV3Schema: PsBackupParameters
+providerManaged:
+    limits: {}
+    pitrParametersSchema:
+        openAPIV3Schema: PsPITRParameters
+    supportsPITR: false
+restoreParametersSchema:
+    openAPIV3Schema: PsRestoreParameters
+supportedProviders:
+    - percona-server-mysql
