@@ -1,6 +1,7 @@
 package provider
 
 import (
+	commonv1alpha1 "github.com/openeverest/openeverest/v2/api/common/v1alpha1"
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
 	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
 
@@ -108,14 +109,23 @@ func componentPodSpec(comp corev1alpha1.ComponentSpec, image string, defaultSize
 	if comp.Resources != nil {
 		ps.Resources = *comp.Resources
 	}
-	if sp := comp.SchedulingPolicy; sp != nil {
-		if sp.Affinity != nil {
-			ps.Affinity = &psv1.PodAffinity{Advanced: sp.Affinity}
-		}
-		ps.NodeSelector = sp.NodeSelector
-		ps.Tolerations = sp.Tolerations
-		ps.TopologySpreadConstraints = sp.TopologySpreadConstraints
-		ps.SchedulerName = sp.SchedulerName
-	}
+	applySchedulingPolicy(&ps, comp.SchedulingPolicy)
 	return ps
+}
+
+// applySchedulingPolicy copies OpenEverest placement settings onto a
+// PerconaServerMySQL pod spec. Affinity is nested under PodAffinity.Advanced
+// because the operator reserves the top-level affinity object for its own
+// anti-affinity defaults.
+func applySchedulingPolicy(ps *psv1.PodSpec, sp *commonv1alpha1.SchedulingPolicy) {
+	if sp == nil {
+		return
+	}
+	if sp.Affinity != nil {
+		ps.Affinity = &psv1.PodAffinity{Advanced: sp.Affinity}
+	}
+	ps.NodeSelector = sp.NodeSelector
+	ps.Tolerations = sp.Tolerations
+	ps.TopologySpreadConstraints = sp.TopologySpreadConstraints
+	ps.SchedulerName = sp.SchedulerName
 }
