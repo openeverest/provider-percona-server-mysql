@@ -1,0 +1,22 @@
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: src-ps-cluster
+status:
+  phase: Ready
+---
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: src-ps-cluster
+status:
+  state: ready
+  mysql:
+    size: 3
+    ready: 3
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: src-ps-cluster-conn
+

@@ -1,0 +1,21 @@
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: src-ps-cluster
+status:
+  phase: Ready
+---
+apiVersion: backup.openeverest.io/v1alpha1
+kind: Restore
+metadata:
+  name: src-restore
+status:
+  state: Succeeded
+---
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQLRestore
+metadata:
+  name: src-restore
+status:
+  state: Succeeded
+

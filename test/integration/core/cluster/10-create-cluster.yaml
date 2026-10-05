@@ -1,22 +1,27 @@
-# Sample Instance for the create-instance step.
-# TODO: adjust the components to match definition/provider.yaml.
 apiVersion: core.openeverest.io/v1alpha1
 kind: Instance
 metadata:
-  name: test-instance
+  name: test-ps-cluster
 spec:
   providerRef:
     name: percona-server-mysql
+  topology:
+    type: groupreplication
   components:
     engine:
-      type: 
-      replicas: 1
+      type: mysql
+      replicas: 3
       resources:
         limits:
           cpu: "1"
-          memory: 1G
+          memory: 4G
         requests:
           cpu: 500m
-          memory: 512M
+          memory: 2G
       storage:
-        size: 10Gi
+        size: 25Gi
+        storageClass: standard
+    proxy:
+      type: haproxy
+      replicas: 1
+

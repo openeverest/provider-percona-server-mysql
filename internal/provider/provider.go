@@ -185,6 +185,8 @@ func (p *Provider) Sync(c *controller.Context) error {
 		}
 	}
 
+	applySchedulingPolicy(&cluster.Spec.MySQL.PodSpec, engine.SchedulingPolicy)
+
 	topologyType := effectiveTopologyType(c.Instance())
 
 	switch topologyType {

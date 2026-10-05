@@ -1,0 +1,36 @@
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: test-ps-cluster
+spec:
+  providerRef:
+    name: percona-server-mysql
+  components:
+    engine:
+      type: mysql
+      replicas: 5
+    proxy:
+      type: haproxy
+      replicas: 1
+      service:
+        serviceType: NodePort
+status:
+  phase: Ready
+---
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: test-ps-cluster
+spec:
+  mysql:
+    size: 5
+  proxy:
+    haproxy:
+      expose:
+        type: NodePort
+status:
+  state: ready
+  mysql:
+    size: 5
+    ready: 5
+

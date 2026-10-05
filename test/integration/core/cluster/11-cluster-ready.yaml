@@ -1,0 +1,11 @@
+---
+# Create the credentials secret so the Instance can reach Ready.
+# The provider reads root from <name>-secrets (spec.secretsName).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-ps-cluster-secrets
+type: Opaque
+stringData:
+  root: test-password
+

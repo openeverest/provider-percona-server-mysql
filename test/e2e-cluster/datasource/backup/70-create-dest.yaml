@@ -1,0 +1,13 @@
+apiVersion: backup.openeverest.io/v1alpha1
+kind: Restore
+metadata:
+  name: ps-src-restore
+spec:
+  instanceRef:
+    name: ps-src
+  dataSource:
+    type: Backup
+    backup:
+      backupRef:
+        name: ps-src-backup
+
