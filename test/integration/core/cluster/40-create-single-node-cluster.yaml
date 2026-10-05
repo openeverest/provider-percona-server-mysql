@@ -1,0 +1,26 @@
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: test-ps-cluster
+spec:
+  providerRef:
+    name: percona-server-mysql
+  topology:
+    type: groupreplication
+  components:
+    engine:
+      type: mysql
+      replicas: 1
+      resources:
+        limits:
+          cpu: "1"
+          memory: 4G
+        requests:
+          cpu: 500m
+          memory: 2G
+      storage:
+        size: 25Gi
+    proxy:
+      type: haproxy
+      replicas: 1
+

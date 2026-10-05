@@ -1,0 +1,41 @@
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: ps-src
+spec:
+  providerRef:
+    name: percona-server-mysql
+  backup:
+    enabled: true
+    classRef:
+      name: ps
+    storages:
+      - storageRef:
+          name: seaweedfs-storage
+        schedules:
+          - name: full
+            enabled: true
+            cron: "0 2 * * *"
+  topology:
+    type: async
+  components:
+    engine:
+      type: mysql
+      replicas: 1
+      storage:
+        size: 1Gi
+      resources:
+        limits:
+          cpu: 600m
+          memory: 1Gi
+        requests:
+          cpu: 600m
+          memory: 1Gi
+    proxy:
+      type: haproxy
+      replicas: 1
+---
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: ps-src

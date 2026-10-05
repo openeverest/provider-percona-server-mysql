@@ -1,0 +1,35 @@
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQLRestore
+metadata:
+  name: ps-src-restore
+status:
+  state: Succeeded
+---
+apiVersion: backup.openeverest.io/v1alpha1
+kind: Restore
+metadata:
+  name: ps-src-restore
+status:
+  state: Succeeded
+---
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: ps-src
+status:
+  phase: Ready
+---
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: ps-src
+status:
+  state: ready
+  mysql:
+    ready: 1
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ps-src-conn
+

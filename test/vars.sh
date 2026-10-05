@@ -1,19 +1,23 @@
 #!/bin/bash
 
-# Environment variables sourced by the `make test-integration*` targets before
-# running chainsaw. Use it to pin the operator/engine versions your tests run
-# against so they are reproducible locally and in CI.
-#
-# Reference values in chainsaw test files via ($values) bindings or plain
-# environment substitution in `script:` steps.
+## ===== General environment variables for the Percona Operator tests =====
+export OPERATOR_ROOT_PATH=${OPERATOR_ROOT_PATH:-${PWD}}
+echo "OPERATOR_ROOT_PATH=${OPERATOR_ROOT_PATH}"
 
-export PROVIDER_ROOT_PATH=${PROVIDER_ROOT_PATH:-${PWD}}
-echo "PROVIDER_ROOT_PATH=${PROVIDER_ROOT_PATH}"
+## ======= Upstream DB operators params for testing ===============
 
-# TODO: pin the versions of your operator and database engine, e.g.:
-#
-# export MY_OPERATOR_VERSION=${MY_OPERATOR_VERSION:-"1.2.3"}
-# echo "MY_OPERATOR_VERSION=${MY_OPERATOR_VERSION}"
-#
-# export MY_DB_ENGINE_VERSION=${MY_DB_ENGINE_VERSION:-"8.0.0"}
-# echo "MY_DB_ENGINE_VERSION=${MY_DB_ENGINE_VERSION}"
+# Recommended Percona Server for MySQL operator version for tests.
+# Keep in sync with PS_OPERATOR_VERSION in the Makefile and go.mod.
+export PS_OPERATOR_VERSION=${PS_OPERATOR_VERSION:-"1.2.0"}
+echo "PS_OPERATOR_VERSION=${PS_OPERATOR_VERSION}"
+
+# Recommended engine version for tests (default version bundle).
+export PS_DB_ENGINE_VERSION=${PS_DB_ENGINE_VERSION:-"8.4.10-10.1"}
+echo "PS_DB_ENGINE_VERSION=${PS_DB_ENGINE_VERSION}"
+
+# Previous versions for upgrade tests.
+export PREVIOUS_PS_DB_ENGINE_VERSION=${PREVIOUS_PS_DB_ENGINE_VERSION:-"8.0.46-37.1"}
+echo "PREVIOUS_PS_DB_ENGINE_VERSION=${PREVIOUS_PS_DB_ENGINE_VERSION}"
+
+export PREVIOUS_PS_OPERATOR_VERSION=${PREVIOUS_PS_OPERATOR_VERSION:-"1.1.0"}
+echo "PREVIOUS_PS_OPERATOR_VERSION=${PREVIOUS_PS_OPERATOR_VERSION}"

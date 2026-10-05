@@ -1,0 +1,22 @@
+apiVersion: backup.openeverest.io/v1alpha1
+kind: Backup
+metadata:
+  name: src-backup
+spec:
+  origin:
+    type: Instance
+    instanceRef:
+      name: src-ps-cluster
+  classRef:
+    name: ps
+  storageRef:
+    name: test-storage-s3
+---
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQLBackup
+metadata:
+  name: src-backup
+spec:
+  clusterName: src-ps-cluster
+  storageName: test-storage-s3
+

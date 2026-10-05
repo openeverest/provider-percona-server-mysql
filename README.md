@@ -228,12 +228,14 @@ code generation, and the backup/restore interfaces are documented once for all p
 ### Testing
 
 - **Unit tests** — `make test-unit`.
-- **Integration tests** — chainsaw suites under `test/integration/`. The scaffolded `core/`
-  suite is a skeleton: it verifies the provider deployment and includes commented-out
-  lifecycle steps to enable as you implement the provider. See
-  [test/integration/README.md](test/integration/README.md).
+- **Integration tests** — chainsaw suites under `test/integration/` (`core/cluster`,
+  `backup/datasource`). The operator is scaled to 0 and status is simulated.
+  See [test/integration/README.md](test/integration/README.md).
+- **E2E cluster tests** — `test/e2e-cluster/` runs against a real PS operator.
+  Not executed on default CI runners; use `make deploy-provider-e2e` then
+  `make test-e2e-cluster` locally.
 - **CI** — `.github/workflows/ci.yaml` runs lint, build, unit tests, generated-file
-  verification, Helm lint, and each integration suite on every pull request.
+  verification, Helm lint, and the integration suites on every pull request.
 
 ## Troubleshooting
 

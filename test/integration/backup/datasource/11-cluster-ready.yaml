@@ -1,0 +1,10 @@
+---
+# Create the credentials secret so the Instance can reach Ready.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: src-ps-cluster-secrets
+type: Opaque
+stringData:
+  root: test-password
+

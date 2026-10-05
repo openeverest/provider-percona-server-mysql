@@ -1,0 +1,188 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: backup-restore
+spec:
+  description: |
+    Restore a Backup onto the same Instance: use cluster SeaweedFS,
+    create an Instance with backups enabled, write data and take a Backup,
+    mutate the data, restore that Backup in place, and verify the original
+    seeded row is back.
+  catch:
+    - script:
+        content: kubectl -n $NAMESPACE get instance,ps.ps.percona.com,backup,ps-backup.ps.percona.com,restore,ps-restore.ps.percona.com,backupstorage -o yaml
+    - script:
+        content: kubectl get backupclass -o yaml
+    - podLogs:
+        namespace: provider-system
+        selector: app.kubernetes.io/name=provider-percona-server-mysql
+        tail: 100
+  steps:
+    - name: provider-operator-installed
+      try:
+        - assert:
+            file: 00-assert.yaml
+
+    - name: deploy-seaweedfs
+      timeouts:
+        exec: 4m
+      try:
+        - script:
+            content: |
+              kubectl apply -f ${OPERATOR_ROOT_PATH}/dev/resources/seaweedfs.yaml
+              kubectl wait --for=condition=available deployment/seaweedfs -n seaweedfs --timeout=120s
+      catch:
+        - script:
+            content: kubectl get pods -n seaweedfs -o yaml
+        - script:
+            content: kubectl logs -n seaweedfs -l app=seaweedfs -c seaweedfs --tail=50
+
+    - name: setup-backup
+      try:
+        - apply:
+            file: 20-install.yaml
+        - assert:
+            file: 20-assert.yaml
+
+    - name: create-source-instance
+      try:
+        - apply:
+            file: 30-create-source.yaml
+        - assert:
+            file: 30-assert.yaml
+      cleanup:
+        - script:
+            timeout: 120s
+            content: |
+              # Operator finalizers (delete-mysql-pvc, delete-backup) otherwise block
+              # namespace deletion past the cleanup timeout.
+              kubectl delete pod/mysql-src-client -n "${NAMESPACE}" --ignore-not-found --wait=false || true
+              kubectl -n "${NAMESPACE}" get ps.ps.percona.com,ps-backup.ps.percona.com,ps-restore.ps.percona.com,pvc -o name 2>/dev/null | while read -r r; do
+                kubectl -n "${NAMESPACE}" patch "$r" --type merge -p '{"metadata":{"finalizers":[]}}' || true
+              done
+
+    - name: source-cluster-ready
+      try:
+        - assert:
+            timeout: 15m
+            file: 40-assert.yaml
+      catch:
+        - script:
+            content: |
+              kubectl -n "${NAMESPACE}" get pods,pvc,ps.ps.percona.com,instance -o wide
+              kubectl -n "${NAMESPACE}" get events --sort-by=.lastTimestamp | tail -50
+              kubectl -n "${NAMESPACE}" describe ps.ps.percona.com/ps-src || true
+              kubectl -n "${NAMESPACE}" describe instance/ps-src || true
+              kubectl -n "${NAMESPACE}" describe pod -l app.kubernetes.io/component=database || true
+              kubectl -n "${NAMESPACE}" logs -l app.kubernetes.io/component=database -c mysql --tail=80 || true
+
+    - name: create-source-mysql-client
+      try:
+        - script:
+            timeout: 180s
+            content: |
+              # Use the engine image already present on the cluster.
+              IMAGE="$(kubectl get ps.ps.percona.com/ps-src -n "${NAMESPACE}" -o jsonpath='{.spec.mysql.image}')"
+              NODE="$(kubectl get pod -n "${NAMESPACE}" -l app.kubernetes.io/instance=ps-src,app.kubernetes.io/component=database -o jsonpath='{.items[0].spec.nodeName}')"
+              kubectl run -n "${NAMESPACE}" mysql-src-client --env="NO_COLOR=1" --image="${IMAGE}" --image-pull-policy=IfNotPresent --restart=Never --overrides="{\"spec\":{\"nodeName\":\"${NODE}\"}}" --command -- sleep 3600
+              kubectl wait --for=condition=Ready pod/mysql-src-client --timeout=150s -n ${NAMESPACE}
+      catch:
+        - script:
+            content: kubectl get pod/mysql-src-client -n $NAMESPACE -o yaml
+
+    - name: seed-source-data
+      try:
+        - script:
+            content: |
+              HOST="$(kubectl get -n ${NAMESPACE} secret/ps-src-conn -o jsonpath='{.data.host}' | base64 --decode)"
+              USER="$(kubectl get -n ${NAMESPACE} secret/ps-src-conn -o jsonpath='{.data.username}' | base64 --decode)"
+              PASS="$(kubectl get -n ${NAMESPACE} secret/ps-src-conn -o jsonpath='{.data.password}' | base64 --decode)"
+              # caching_sha2_password needs RSA public-key exchange when the
+              # server auth cache is empty (first connect and after restore).
+              kubectl exec mysql-src-client -n ${NAMESPACE} -- mysql --get-server-public-key --ssl-mode=DISABLED -h "$HOST" -P 3306 -u "$USER" -p"$PASS" -e \
+                "CREATE DATABASE IF NOT EXISTS e2e; CREATE TABLE IF NOT EXISTS e2e.test(id varchar(64) primary key); INSERT IGNORE INTO e2e.test(id) VALUES ('openeverest');"
+
+    - name: create-backup
+      try:
+        - apply:
+            file: 50-create-backup.yaml
+        - assert:
+            file: 50-assert.yaml
+
+    - name: backup-complete
+      try:
+        - assert:
+            timeout: 360s
+            file: 60-assert.yaml
+
+    - name: mutate-source-data
+      try:
+        - script:
+            content: |
+              HOST="$(kubectl get -n ${NAMESPACE} secret/ps-src-conn -o jsonpath='{.data.host}' | base64 --decode)"
+              USER="$(kubectl get -n ${NAMESPACE} secret/ps-src-conn -o jsonpath='{.data.username}' | base64 --decode)"
+              PASS="$(kubectl get -n ${NAMESPACE} secret/ps-src-conn -o jsonpath='{.data.password}' | base64 --decode)"
+              kubectl exec mysql-src-client -n ${NAMESPACE} -- mysql --get-server-public-key --ssl-mode=DISABLED -h "$HOST" -P 3306 -u "$USER" -p"$PASS" -e \
+                "INSERT IGNORE INTO e2e.test(id) VALUES ('after-backup');"
+
+    - name: create-restore
+      try:
+        - apply:
+            file: 70-create-dest.yaml
+        - assert:
+            timeout: 360s
+            file: 70-assert.yaml
+
+    - name: restore-created
+      try:
+        - assert:
+            timeout: 360s
+            file: 80-assert.yaml
+
+    - name: restore-complete
+      try:
+        - assert:
+            timeout: 480s
+            file: 90-assert.yaml
+
+    - name: verify-restored-data
+      try:
+        - script:
+            timeout: 120s
+            content: |
+              HOST="$(kubectl get -n ${NAMESPACE} secret/ps-src-conn -o jsonpath='{.data.host}' | base64 --decode)"
+              USER="$(kubectl get -n ${NAMESPACE} secret/ps-src-conn -o jsonpath='{.data.username}' | base64 --decode)"
+              PASS="$(kubectl get -n ${NAMESPACE} secret/ps-src-conn -o jsonpath='{.data.password}' | base64 --decode)"
+              PS_POD="$(kubectl get pod -n ${NAMESPACE} -l app.kubernetes.io/instance=ps-src,app.kubernetes.io/component=database -o jsonpath='{.items[0].metadata.name}')"
+              SQL="SELECT id FROM e2e.test ORDER BY id;"
+              found=""
+              for i in 1 2 3 4 5 6 7 8 9 10; do
+                found="$(kubectl exec mysql-src-client -n ${NAMESPACE} -- mysql --get-server-public-key --ssl-mode=DISABLED -N -s -h "$HOST" -P 3306 -u "$USER" -p"$PASS" -e "$SQL" || true)"
+                compact="$(echo "$found" | tr -d '[:space:]')"
+                if [ "$compact" != "openeverest" ]; then
+                  found="$(kubectl exec mysql-src-client -n ${NAMESPACE} -- mysql --ssl-mode=REQUIRED -N -s -h "$HOST" -P 3306 -u "$USER" -p"$PASS" -e "$SQL" || true)"
+                  compact="$(echo "$found" | tr -d '[:space:]')"
+                fi
+                if [ "$compact" != "openeverest" ] && [ -n "$PS_POD" ]; then
+                  # Unix socket as root does not need TLS / RSA key exchange.
+                  found="$(kubectl exec -n ${NAMESPACE} -c mysql "$PS_POD" -- mysql -N -s -u "$USER" -p"$PASS" -e "$SQL" || true)"
+                  compact="$(echo "$found" | tr -d '[:space:]')"
+                fi
+                if [ "$compact" = "openeverest" ]; then
+                  echo "Found: $found"
+                  exit 0
+                fi
+                echo "attempt $i: found='$found'"
+                sleep 5
+              done
+              echo "Found: $found"
+              test "$(echo "$found" | tr -d '[:space:]')" = "openeverest"
+
+    - name: cleanup
+      try:
+        - script:
+            timeout: 180s
+            content: |
+              kubectl delete pod/mysql-src-client -n $NAMESPACE --ignore-not-found --wait=false || true
+              kubectl delete instance/ps-src -n $NAMESPACE --ignore-not-found --wait=true --timeout=150s || true
+

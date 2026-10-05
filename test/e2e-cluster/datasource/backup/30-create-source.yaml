@@ -1,0 +1,41 @@
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: ps-src
+spec:
+  providerRef:
+    name: percona-server-mysql
+  backup:
+    enabled: true
+    classRef:
+      name: ps
+    storages:
+      - storageRef:
+          name: seaweedfs-storage
+        # A schedule is required: the provider prunes storages that have neither
+        # schedules nor Backup CRs, which would disable backups before the
+        # on-demand Backup in this suite is created.
+        schedules:
+          - name: full
+            enabled: true
+            cron: "0 2 * * *"
+  # Async + HAProxy is the smallest topology the operator will actually start.
+  # Group replication needs a quorum, so a one-node GR cluster would not become Ready.
+  topology:
+    type: async
+  components:
+    engine:
+      type: mysql
+      replicas: 1
+      storage:
+        size: 1Gi
+      resources:
+        limits:
+          cpu: 600m
+          memory: 1Gi
+        requests:
+          cpu: 600m
+          memory: 1Gi
+    proxy:
+      type: haproxy
+      replicas: 1

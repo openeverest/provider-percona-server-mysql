@@ -1,0 +1,55 @@
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: src-ps-cluster
+spec:
+  providerRef:
+    name: percona-server-mysql
+  backup:
+    enabled: true
+    classRef:
+      name: ps
+    storages:
+    - storageRef:
+        name: test-storage-s3
+      schedules:
+      - name: full
+        enabled: true
+        cron: "0 2 * * *"
+  components:
+    engine:
+      type: mysql
+      replicas: 3
+    proxy:
+      type: haproxy
+      replicas: 1
+---
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: src-ps-cluster
+spec:
+  mysql:
+    size: 3
+  proxy:
+    haproxy:
+      enabled: true
+      size: 1
+  backup:
+    image: percona/percona-xtrabackup:8.4.0-6.1
+    storages:
+      test-storage-s3:
+        type: s3
+        s3:
+          region: us-east-1
+          endpointUrl: http://fake
+          credentialsSecret: backup-storage-credentials
+        containerOptions:
+          env:
+            - name: AWS_FORCE_PATH_STYLE
+              value: "true"
+    schedule:
+      - name: full
+        schedule: "0 2 * * *"
+        storageName: test-storage-s3
+
