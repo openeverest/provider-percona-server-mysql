@@ -1,0 +1,30 @@
+# BackupStorage CR (+ credentials Secret) pointing at the in-cluster SeaweedFS.
+#
+# Rendered by dev/Tiltfile when ENABLE_SEAWEEDFS=true. The __NAMESPACE__ token is
+# replaced with the provider namespace at apply time.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: seaweedfs-credentials
+  namespace: __NAMESPACE__
+type: Opaque
+data:
+  # seaweedfsadmin / seaweedfsadmin
+  AWS_ACCESS_KEY_ID: c2Vhd2VlZGZzYWRtaW4=
+  AWS_SECRET_ACCESS_KEY: c2Vhd2VlZGZzYWRtaW4=
+---
+apiVersion: backup.openeverest.io/v1alpha1
+kind: BackupStorage
+metadata:
+  name: seaweedfs-s3
+  namespace: __NAMESPACE__
+spec:
+  type: s3
+  s3:
+    bucket: backups
+    region: us-east-1
+    endpointURL: https://seaweedfs.seaweedfs.svc.cluster.local
+    forcePathStyle: true
+    verifyTLS: false
+    credentialsSecretRef:
+      name: seaweedfs-credentials
