@@ -20,6 +20,44 @@
     - update
     - watch
 - apiGroups:
+    - backup.openeverest.io
+  resources:
+    - backupclasses
+    - backupstorages
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
+    - backup.openeverest.io
+  resources:
+    - backups
+    - restores
+  verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - backup.openeverest.io
+  resources:
+    - backups/finalizers
+    - restores/finalizers
+  verbs:
+    - update
+- apiGroups:
+    - backup.openeverest.io
+  resources:
+    - backups/status
+    - restores/status
+  verbs:
+    - get
+    - patch
+    - update
+- apiGroups:
     - coordination.k8s.io
   resources:
     - leases
@@ -66,6 +104,8 @@
 - apiGroups:
     - ps.percona.com
   resources:
+    - perconaservermysqlbackups
+    - perconaservermysqlrestores
     - perconaservermysqls
   verbs:
     - create
@@ -75,3 +115,19 @@
     - patch
     - update
     - watch
+- apiGroups:
+    - ps.percona.com
+  resources:
+    - perconaservermysqlbackups/finalizers
+    - perconaservermysqlrestores/finalizers
+    - perconaservermysqls/finalizers
+  verbs:
+    - update
+- apiGroups:
+    - ps.percona.com
+  resources:
+    - perconaservermysqlbackups/status
+    - perconaservermysqlrestores/status
+    - perconaservermysqls/status
+  verbs:
+    - get

@@ -8,11 +8,13 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	backupv1alpha1 "github.com/openeverest/openeverest/v2/api/backup/v1alpha1"
 	"github.com/openeverest/openeverest/v2/provider-runtime/controller"
 	"github.com/openeverest/provider-percona-server-mysql/internal/common"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -38,6 +40,14 @@ func New() *Provider {
 			WatchConfigs: []controller.WatchConfig{
 				controller.WatchOwned(
 					&psv1.PerconaServerMySQL{},
+				),
+				// Watch Restores so the Instance leaves the Restoring phase
+				// as soon as one reaches a terminal state. The engine
+				// usually reports ready before the Restore CR does, so
+				// without this the Instance would sit in Restoring until an
+				// unrelated event arrived.
+				controller.WatchExternal(&backupv1alpha1.Restore{},
+					handler.EnqueueRequestsFromMapFunc(enqueueRestoreInstance()),
 				),
 			},
 		},
@@ -69,6 +79,19 @@ func (p *Provider) Validate(c *controller.Context) error {
 func (p *Provider) Sync(c *controller.Context) error {
 	l := log.FromContext(c.Context())
 	l.Info("Syncing instance", "name", c.Name())
+
+	// The PS operator toggles cluster.Spec.Pause directly while a
+	// PerconaServerMySQLRestore runs (see the psrestore controller). Sync
+	// must not fight that by re-asserting the desired spec (which defaults
+	// Pause back to false) while a restore is in flight.
+	activeRestore, err := hasActiveRestoreForInstance(c, c.Namespace(), c.Name())
+	if err != nil {
+		return fmt.Errorf("check active restores for %q: %w", c.Name(), err)
+	}
+	if activeRestore {
+		l.Info("Skipping spec sync while restore is active", "name", c.Name())
+		return nil
+	}
 
 	providerSpec, err := c.ProviderSpec()
 	if err != nil {
@@ -187,6 +210,10 @@ func (p *Provider) Sync(c *controller.Context) error {
 		return fmt.Errorf("apply proxy: %w", err)
 	}
 
+	if err := applyBackupSettings(c, cluster); err != nil {
+		return fmt.Errorf("apply backup settings: %w", err)
+	}
+
 	if err := c.Apply(cluster); err != nil {
 		return fmt.Errorf("apply PerconaServerMySQL %q: %w", c.Name(), err)
 	}
@@ -211,6 +238,19 @@ func (p *Provider) Status(
 		}
 
 		return controller.Status{}, fmt.Errorf("get PerconaServerMySQL %q: %w", c.Name(), err)
+	}
+
+	// A restore drives the engine through paused, starting and momentarily
+	// ready states, so reading the phase off the engine alone makes the
+	// Instance flap between Restoring, Provisioning and Ready while one is
+	// in flight. The Restore CR reaching a terminal state is what ends the
+	// restore, so let it own the phase for as long as it is running.
+	activeRestore, err := hasActiveRestoreForInstance(c, c.Namespace(), c.Name())
+	if err != nil {
+		return controller.Status{}, fmt.Errorf("check active restores for %q: %w", c.Name(), err)
+	}
+	if activeRestore {
+		return controller.Restoring("Restore is running"), nil
 	}
 
 	switch cluster.Status.State {

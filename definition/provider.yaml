@@ -9,4 +9,12 @@ components:
         type: orchestrator
     proxy:
         type: haproxy
+    # backup is not a structural component (it never appears in any
+    # topology's config.components and users never set
+    # spec.components.backup): it exists solely so version bundles can pin
+    # the xtrabackup image used by PerconaServerMySQLBackup/-Restore
+    # resources. See internal/provider/backup_mirror.go's
+    # resolveBackupImage and definition/versions.yaml's componentTypes.backup.
+    backup:
+        type: backup
 name: percona-server-mysql
