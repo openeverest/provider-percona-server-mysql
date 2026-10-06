@@ -71,7 +71,7 @@ provider itself is covered under [Installation](#installation).
 | Vertical scaling (CPU / memory) | ❌ | |
 | Version upgrades | ❌ | |
 | Custom configuration | ❌ | |
-| Monitoring | ❌ | |
+| Monitoring | ✅ | PMM, via the optional `monitoring` component |
 | TLS | ❌ | |
 
 Stateful workloads additionally report:
@@ -229,9 +229,12 @@ code generation, and the backup/restore interfaces are documented once for all p
 
 - **Unit tests** — `make test-unit`.
 - **Integration tests** — chainsaw suites under `test/integration/` (`core/cluster`,
-  `backup/datasource`). The operator is scaled to 0 and status is simulated.
-  See [test/integration/README.md](test/integration/README.md).
-- **E2E cluster tests** — `test/e2e-cluster/` runs against a real PS operator.
+  `backup/datasource`, `monitoring/pmm`). The operator is scaled to 0 and status is simulated.
+  See [test/integration/README.md](test/integration/README.md). Individual suites are also
+  exposed as make targets (`make test-integration-core`, `make test-integration-backup`,
+  `make test-integration-monitoring-pmm`).
+- **E2E cluster tests** — `test/e2e-cluster/` runs against a real PS operator
+  (`datasource/backup`, `monitoring/pmm`).
   Not executed on default CI runners; use `make deploy-provider-e2e` then
   `make test-e2e-cluster` locally.
 - **CI** — `.github/workflows/ci.yaml` runs lint, build, unit tests, generated-file

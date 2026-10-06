@@ -1,0 +1,28 @@
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: ps-mon
+spec:
+  mysql:
+    clusterType: async
+    size: 1
+  unsafeFlags:
+    mysqlSize: true
+  proxy:
+    haproxy:
+      enabled: true
+      size: 1
+  pmm:
+    enabled: true
+    serverHost: pmm.example.invalid
+    image: percona/pmm-client:3.8.0
+    customClusterName: ps-mon
+    imagePullPolicy: IfNotPresent
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ps-mon-secrets
+type: Opaque
+data:
+  pmmservertoken: YWJjZGVm

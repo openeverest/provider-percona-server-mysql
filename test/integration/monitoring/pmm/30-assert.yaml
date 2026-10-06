@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-pmm-secret
+type: Opaque
+data:
+  apiKey: YXNkZmcxMjM=
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-ps-cluster-secrets
+type: Opaque
+data:
+  pmmservertoken: YXNkZmcxMjM=
+---
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: test-ps-cluster
+spec:
+  pmm:
+    enabled: true
+    serverHost: pmm-updated.example.invalid
+    image: percona/pmm-client:3.8.0
+

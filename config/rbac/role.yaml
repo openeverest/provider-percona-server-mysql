@@ -111,6 +111,14 @@ rules:
   - list
   - watch
 - apiGroups:
+  - monitoring.openeverest.io
+  resources:
+  - monitoringconfigs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - ps.percona.com
   resources:
   - perconaservermysqlbackups

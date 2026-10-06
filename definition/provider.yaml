@@ -17,4 +17,7 @@ components:
     # resolveBackupImage and definition/versions.yaml's componentTypes.backup.
     backup:
         type: backup
+    monitoring:
+        type: pmm
+        parametersSchema: PMMParameters
 name: percona-server-mysql

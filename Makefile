@@ -16,7 +16,7 @@ PS_OPERATOR_VERSION ?= 1.2.0
 
 # PS operator replicas to deploy alongside the provider in integration envs.
 # CI sets this to 0 so suites simulate operator status.
-PS_OPERATOR_REPLICA_COUNT ?= 1
+PS_OPERATOR_REPLICA_COUNT ?= 0
 
 # Local checkout path used when bootstrapping the OpenEverest controller for
 # integration tests.
@@ -168,6 +168,18 @@ test-integration-backup: ## Run backup integration tests.
 test-integration-backup-datasource: ## Run backup datasource integration tests.
 	. ./test/vars.sh && chainsaw test --config ./test/integration/.chainsaw.yaml ./test/integration/backup/datasource
 
+.PHONY: test-integration-monitoring-pmm
+test-integration-monitoring-pmm: ## Run PMM integration tests.
+	. ./test/vars.sh && chainsaw test --config ./test/integration/.chainsaw.yaml ./test/integration/monitoring
+
+.PHONY: test-e2e-cluster
+test-e2e-cluster: ## Run E2E cluster tests (requires the PS operator).
+	. ./test/vars.sh && chainsaw test --config ./test/e2e-cluster/.chainsaw.yaml ./test/e2e-cluster
+
+.PHONY: test-e2e-cluster-monitoring-pmm
+test-e2e-cluster-monitoring-pmm: ## Run PMM e2e-cluster test (requires a running PS operator).
+	. ./test/vars.sh && chainsaw test --config ./test/e2e-cluster/.chainsaw.yaml ./test/e2e-cluster/monitoring/pmm
+
 .PHONY: test-integration-env-up
 test-integration-env-up: openeverest-checkout ## Bootstrap the local environment for integration tests.
 	$(MAKE) k3d-cluster-up
@@ -295,7 +307,7 @@ $(YQ): $(LOCALBIN)
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Install golangci-lint.
 $(GOLANGCI_LINT): $(LOCALBIN)
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci-lint/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and target name. Usage:
 # $(call go-install-tool,<target>,<package>,<version>)

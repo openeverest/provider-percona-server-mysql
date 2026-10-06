@@ -22,6 +22,9 @@ const (
 	// backups and restores.
 	ComponentBackup = "backup"
 
+	ComponentMonitoring = "monitoring"
+	MonitoringTypePMM   = "pmm"
+
 	TopologyAsync            = "async"
 	TopologyGroupReplication = "groupreplication"
 )

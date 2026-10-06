@@ -1,0 +1,163 @@
+---
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: monitoring-pmm
+spec:
+  description: |
+    PMM monitoring lifecycle for the Percona Server for MySQL provider: attach a
+    MonitoringConfig, map it onto PerconaServerMySQL.spec.pmm (host, PMM 3
+    image, cluster name), copy the API key into the users secret as
+    pmmservertoken, propagate URL and credential updates, then disable and
+    re-enable monitoring.
+    The Percona operator is scaled to 0 so status is simulated.
+  catch:
+    - script:
+        content: kubectl -n $NAMESPACE get instance,ps.ps.percona.com,monitoringconfig,secret -o yaml
+    - podLogs:
+        namespace: provider-system
+        selector: app.kubernetes.io/name=provider-percona-server-mysql
+        tail: 100
+    - script:
+        content: |
+          for kind in ps.ps.percona.com instance; do
+            kubectl -n "$NAMESPACE" get "$kind" -o name 2>/dev/null | while read -r obj; do
+              kubectl -n "$NAMESPACE" patch "$obj" --type=merge -p '{"metadata":{"finalizers":[]}}' || true
+            done
+          done
+  steps:
+    - name: setup-monitoring
+      try:
+        - script:
+            content: |
+              kubectl -n provider-system scale deployment/provider-percona-server-mysql-ps-operator --replicas=0
+              kubectl -n provider-system wait --for=jsonpath='{.spec.replicas}'=0 deployment/provider-percona-server-mysql-ps-operator --timeout=60s
+              # Operator-created webhook has no endpoints once scaled to 0.
+              kubectl get validatingwebhookconfiguration -o name 2>/dev/null | while read -r name; do
+                case "$name" in
+                  *percona-server-mysql*|*ps-operator*) kubectl delete "$name" --ignore-not-found ;;
+                esac
+              done
+        - apply:
+            file: 00-install.yaml
+        - assert:
+            file: 00-assert.yaml
+
+    - name: create-cluster
+      try:
+        - apply:
+            file: 10-create-cluster.yaml
+        - script:
+            content: |
+              # The users secret is created in the same step. If Sync ran before
+              # it existed, nudge the Instance so the token is copied.
+              for i in $(seq 1 30); do
+                token=$(kubectl get secret/test-ps-cluster-secrets -n "$NAMESPACE" -o jsonpath='{.data.pmmservertoken}' 2>/dev/null || true)
+                host=$(kubectl get ps.ps.percona.com/test-ps-cluster -n "$NAMESPACE" -o jsonpath='{.spec.pmm.serverHost}' 2>/dev/null || true)
+                if [ "$token" = "YWJjZGVm" ] && [ "$host" = "pmm.example.invalid" ]; then
+                  exit 0
+                fi
+                kubectl annotate instance/test-ps-cluster -n "$NAMESPACE" test.openeverest.io/reconcile="$(date +%s)" --overwrite || true
+                sleep 1
+              done
+              echo "PMM spec or pmmservertoken was not applied" >&2
+              exit 1
+        - assert:
+            file: 10-assert.yaml
+
+    - name: cluster-ready
+      try:
+        - apply:
+            file: 11-cluster-ready.yaml
+        - script:
+            content: |
+              kubectl patch ps.ps.percona.com/test-ps-cluster --subresource status -n "$NAMESPACE" --type=merge \
+                -p "{\"status\":{\"state\":\"ready\",\"host\":\"test-ps-cluster-haproxy.${NAMESPACE}.svc.cluster.local\",\"mysql\":{\"size\":3,\"ready\":3,\"state\":\"ready\"},\"haproxy\":{\"size\":1,\"ready\":1,\"state\":\"ready\"}}}"
+        - assert:
+            file: 11-assert.yaml
+
+    - name: custom-monitoring-resources
+      try:
+        - apply:
+            file: 14-cluster-custom-monitoring-resource.yaml
+        - script:
+            content: |
+              kubectl wait ps.ps.percona.com/test-ps-cluster -n "$NAMESPACE" \
+                --for=jsonpath='{.spec.pmm.resources.limits.cpu}'=500m --timeout=30s
+              kubectl patch ps.ps.percona.com/test-ps-cluster --subresource status -n "$NAMESPACE" --type=merge \
+                -p "{\"status\":{\"state\":\"ready\",\"host\":\"test-ps-cluster-haproxy.${NAMESPACE}.svc.cluster.local\",\"mysql\":{\"size\":3,\"ready\":3,\"state\":\"ready\"},\"haproxy\":{\"size\":1,\"ready\":1,\"state\":\"ready\"}}}"
+        - assert:
+            file: 14-assert.yaml
+
+    - name: update-monitoring-config
+      try:
+        - apply:
+            file: 20-update-config.yaml
+        - script:
+            content: |
+              kubectl wait ps.ps.percona.com/test-ps-cluster -n "$NAMESPACE" \
+                --for=jsonpath='{.spec.pmm.serverHost}'=pmm-updated.example.invalid --timeout=30s
+        - assert:
+            file: 20-assert.yaml
+
+    - name: update-monitoring-credentials
+      try:
+        - apply:
+            file: 30-update-credentials.yaml
+        - script:
+            content: |
+              # Secrets are not watched; bump MonitoringConfig so Sync re-copies the token.
+              kubectl annotate monitoringconfig/test-pmm -n "$NAMESPACE" test.openeverest.io/reconcile="$(date +%s)" --overwrite
+              for i in $(seq 1 30); do
+                token=$(kubectl get secret/test-ps-cluster-secrets -n "$NAMESPACE" -o jsonpath='{.data.pmmservertoken}')
+                if [ "$token" = "YXNkZmcxMjM=" ]; then
+                  exit 0
+                fi
+                sleep 1
+              done
+              echo "pmmservertoken was not updated" >&2
+              exit 1
+        - assert:
+            file: 30-assert.yaml
+
+    - name: disable-monitoring
+      try:
+        - apply:
+            file: 40-disable-monitoring.yaml
+        - assert:
+            file: 40-assert.yaml
+
+    - name: enable-monitoring
+      try:
+        - apply:
+            file: 50-enable-monitoring.yaml
+        - script:
+            content: |
+              kubectl wait ps.ps.percona.com/test-ps-cluster -n "$NAMESPACE" \
+                --for=jsonpath='{.spec.pmm.enabled}'=true --timeout=30s
+              kubectl patch ps.ps.percona.com/test-ps-cluster --subresource status -n "$NAMESPACE" --type=merge \
+                -p "{\"status\":{\"state\":\"ready\",\"host\":\"test-ps-cluster-haproxy.${NAMESPACE}.svc.cluster.local\",\"mysql\":{\"size\":3,\"ready\":3,\"state\":\"ready\"},\"haproxy\":{\"size\":1,\"ready\":1,\"state\":\"ready\"}}}"
+        - assert:
+            file: 50-assert.yaml
+
+    - name: delete-cluster
+      try:
+        - script:
+            content: |
+              kubectl -n $NAMESPACE delete instance/test-ps-cluster ps.ps.percona.com/test-ps-cluster --wait=false --ignore-not-found && sleep 5
+              kubectl -n $NAMESPACE patch ps.ps.percona.com/test-ps-cluster -p '{"metadata":{"finalizers":null}}' --type merge || true
+        - wait:
+            apiVersion: core.openeverest.io/v1alpha1
+            kind: Instance
+            name: test-ps-cluster
+            for:
+              deletion: {}
+        - wait:
+            apiVersion: ps.percona.com/v1
+            kind: PerconaServerMySQL
+            name: test-ps-cluster
+            for:
+              deletion: {}
+        - assert:
+            file: 60-assert.yaml
+
