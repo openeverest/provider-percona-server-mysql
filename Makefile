@@ -16,7 +16,7 @@ PS_OPERATOR_VERSION ?= 1.2.0
 
 # PS operator replicas to deploy alongside the provider in integration envs.
 # CI sets this to 0 so suites simulate operator status.
-PS_OPERATOR_REPLICA_COUNT ?= 0
+PS_OPERATOR_REPLICA_COUNT ?= 1
 
 # Local checkout path used when bootstrapping the OpenEverest controller for
 # integration tests.
@@ -303,7 +303,7 @@ $(YQ): $(LOCALBIN)
 .PHONY: golangci-lint
 golangci-lint: $(GOLANGCI_LINT) ## Install golangci-lint.
 $(GOLANGCI_LINT): $(LOCALBIN)
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci-lint/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/v2/cmd/golangci-lint,$(GOLANGCI_LINT_VERSION))
 
 # go-install-tool will 'go install' any package with custom target and target name. Usage:
 # $(call go-install-tool,<target>,<package>,<version>)
