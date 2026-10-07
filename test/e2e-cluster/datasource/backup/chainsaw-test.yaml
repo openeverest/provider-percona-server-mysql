@@ -4,15 +4,17 @@ metadata:
   name: backup-restore
 spec:
   description: |
-    Restore a Backup onto the same Instance: use cluster SeaweedFS,
+    Restore a Backup onto the same Instance: use cluster SeaweedFS, deploy PMM,
     create an Instance with backups enabled, write data and take a Backup,
     mutate the data, restore that Backup in place, and verify the original
     seeded row is back.
   catch:
     - script:
-        content: kubectl -n $NAMESPACE get instance,ps.ps.percona.com,backup,ps-backup.ps.percona.com,restore,ps-restore.ps.percona.com,backupstorage -o yaml
+        content: kubectl -n $NAMESPACE get instance,ps.ps.percona.com,backup,ps-backup.ps.percona.com,restore,ps-restore.ps.percona.com,backupstorage,monitoringconfig -o yaml
     - script:
         content: kubectl get backupclass -o yaml
+    - script:
+        content: kubectl -n pmm get pods -o yaml
     - podLogs:
         namespace: provider-system
         selector: app.kubernetes.io/name=provider-percona-server-mysql
@@ -36,6 +38,68 @@ spec:
             content: kubectl get pods -n seaweedfs -o yaml
         - script:
             content: kubectl logs -n seaweedfs -l app=seaweedfs -c seaweedfs --tail=50
+
+    - name: deploy-pmm
+      timeouts:
+        exec: 10m
+      try:
+        - script:
+            content: |
+              kubectl apply -f ${OPERATOR_ROOT_PATH}/test/testdata/pmm/deploy.yaml
+        - script:
+            timeout: 360s
+            content: |
+              kubectl -n pmm wait --for=condition=Ready pod -l app=pmm-server --timeout=360s
+        # Provision a PMM3 service-account token (default admin/admin creds),
+        # then create the credentials Secret the MonitoringConfig references.
+        # The token is dynamic, so the Secret is created via script rather
+        # than a static manifest; the MonitoringConfig itself lives in
+        # 20-install.yaml.
+        - script:
+            timeout: 120s
+            content: |
+              set -e
+              PMM_POD="$(kubectl -n pmm get pod -l app=pmm-server -o jsonpath='{.items[0].metadata.name}')"
+
+              # Create a service account and token via the PMM API, running
+              # entirely inside the pod so no host-side tooling is needed.
+              # Do not use UID: it is readonly in bash/sh.
+              TOKEN="$(kubectl -n pmm exec -i "${PMM_POD}" -- sh <<'EOF'
+              set -e
+              PMM_API='https://127.0.0.1:8443/graph/api'
+              SA_NAME="everest-$(date +%s)"
+
+              SA=$(curl -fsSk -u admin:admin \
+                -H 'Content-Type: application/json' \
+                -d "{\"name\":\"${SA_NAME}\",\"role\":\"Admin\"}" \
+                "${PMM_API}/serviceaccounts")
+              # Extract the "uid" value: strip up to '"uid":"', then from the next '"'.
+              SA_UID=${SA##*\"uid\":\"}
+              SA_UID=${SA_UID%%\"*}
+              test -n "${SA_UID}"
+
+              KEY=$(curl -fsSk -u admin:admin \
+                -H 'Content-Type: application/json' \
+                -d "{\"name\":\"${SA_NAME}-token\",\"role\":\"Admin\"}" \
+                "${PMM_API}/serviceaccounts/${SA_UID}/tokens")
+              # Extract the "key" value: strip up to '"key":"', then from the next '"'.
+              KEY=${KEY##*\"key\":\"}
+              KEY=${KEY%%\"*}
+              test -n "${KEY}"
+              echo "${KEY}"
+              EOF
+              )"
+
+              test -n "${TOKEN}"
+
+              kubectl -n ${NAMESPACE} create secret generic mc-pmm-secret \
+                --from-literal=apiKey="${TOKEN}" \
+                --dry-run=client -o yaml | kubectl apply -f -
+      catch:
+        - script:
+            content: kubectl -n pmm get pods -o yaml
+        - script:
+            content: kubectl -n pmm logs -l app=pmm-server --tail=100
 
     - name: setup-backup
       try:
@@ -75,6 +139,31 @@ spec:
               kubectl -n "${NAMESPACE}" describe instance/ps-src || true
               kubectl -n "${NAMESPACE}" describe pod -l app.kubernetes.io/component=database || true
               kubectl -n "${NAMESPACE}" logs -l app.kubernetes.io/component=database -c mysql --tail=80 || true
+
+    - name: monitoring-applied
+      timeouts:
+        exec: 3m
+      try:
+        - script:
+            content: |
+              # The operator creates <name>-secrets; Sync copies apiKey into pmmservertoken.
+              for i in $(seq 1 60); do
+                host=$(kubectl get ps.ps.percona.com/ps-src -n "$NAMESPACE" -o jsonpath='{.spec.pmm.serverHost}' 2>/dev/null || true)
+                token=$(kubectl get secret/ps-src-secrets -n "$NAMESPACE" -o jsonpath='{.data.pmmservertoken}' 2>/dev/null || true)
+                internal=$(kubectl get secret/internal-ps-src -n "$NAMESPACE" -o jsonpath='{.data.pmmservertoken}' 2>/dev/null || true)
+                expected=$(kubectl get secret/mc-pmm-secret -n "$NAMESPACE" -o jsonpath='{.data.apiKey}' 2>/dev/null || true)
+                if [ "$host" = "pmm-server.pmm.svc" ] && [ -n "$expected" ] && [ "$token" = "$expected" ] && [ "$internal" = "$expected" ]; then
+                  exit 0
+                fi
+                sleep 2
+              done
+              echo "PMM spec or pmmservertoken was not applied" >&2
+              kubectl -n "$NAMESPACE" get ps.ps.percona.com/ps-src -o yaml || true
+              kubectl -n "$NAMESPACE" get secret/ps-src-secrets -o yaml || true
+              exit 1
+      catch:
+        - script:
+            content: kubectl -n "$NAMESPACE" get secret/mc-pmm-secret -o yaml || true
 
     - name: create-source-mysql-client
       try:
@@ -185,4 +274,4 @@ spec:
             content: |
               kubectl delete pod/mysql-src-client -n $NAMESPACE --ignore-not-found --wait=false || true
               kubectl delete instance/ps-src -n $NAMESPACE --ignore-not-found --wait=true --timeout=150s || true
-
+              kubectl delete -f ${OPERATOR_ROOT_PATH}/test/testdata/pmm/deploy.yaml --ignore-not-found || true

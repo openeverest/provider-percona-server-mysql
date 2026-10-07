@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ps-mon-secrets
+type: Opaque
+data:
+  pmmservertoken: YXNkZmcxMjM=
+---
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: ps-mon
+spec:
+  pmm:
+    enabled: true
+    serverHost: pmm-updated.example.invalid
+

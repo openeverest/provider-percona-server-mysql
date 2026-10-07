@@ -1,0 +1,129 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: monitoring-pmm
+spec:
+  description: |
+    PMM monitoring against a running Percona Server for MySQL operator.
+    A one-node async cluster is the smallest topology the operator will start.
+    Assertions cover spec.pmm and the users-secret token the operator reads
+    (pmmservertoken). They do not require a reachable PMM server.
+  catch:
+    - script:
+        content: kubectl -n $NAMESPACE get instance,ps.ps.percona.com,monitoringconfig,secret,pods -o yaml
+    - podLogs:
+        namespace: provider-system
+        selector: app.kubernetes.io/name=provider-percona-server-mysql
+        tail: 100
+  steps:
+    - name: provider-operator-installed
+      try:
+        - assert:
+            file: 00-assert.yaml
+
+    - name: setup-monitoring
+      try:
+        - apply:
+            file: 10-install.yaml
+        - assert:
+            file: 10-assert.yaml
+
+    - name: create-cluster
+      try:
+        - apply:
+            file: 20-create-cluster.yaml
+      cleanup:
+        - script:
+            timeout: 120s
+            content: |
+              kubectl -n "${NAMESPACE}" get ps.ps.percona.com,pvc -o name 2>/dev/null | while read -r r; do
+                kubectl -n "${NAMESPACE}" patch "$r" --type merge -p '{"metadata":{"finalizers":[]}}' || true
+              done
+
+    - name: monitoring-applied
+      timeouts:
+        exec: 3m
+      try:
+        - script:
+            content: |
+              # The operator creates <name>-secrets; Sync copies apiKey into pmmservertoken.
+              for i in $(seq 1 60); do
+                host=$(kubectl get ps.ps.percona.com/ps-mon -n "$NAMESPACE" -o jsonpath='{.spec.pmm.serverHost}' 2>/dev/null || true)
+                token=$(kubectl get secret/ps-mon-secrets -n "$NAMESPACE" -o jsonpath='{.data.pmmservertoken}' 2>/dev/null || true)
+                if [ "$host" = "pmm.example.invalid" ] && [ "$token" = "YWJjZGVm" ]; then
+                  exit 0
+                fi
+                sleep 2
+              done
+              echo "PMM spec or pmmservertoken was not applied" >&2
+              kubectl -n "$NAMESPACE" get ps.ps.percona.com/ps-mon -o yaml || true
+              kubectl -n "$NAMESPACE" get secret/ps-mon-secrets -o yaml || true
+              exit 1
+        - assert:
+            file: 20-assert.yaml
+
+    - name: update-monitoring-config
+      timeouts:
+        exec: 2m
+      try:
+        - apply:
+            file: 30-update-config.yaml
+        - script:
+            content: |
+              kubectl wait ps.ps.percona.com/ps-mon -n "$NAMESPACE" \
+                --for=jsonpath='{.spec.pmm.serverHost}'=pmm-updated.example.invalid --timeout=60s
+        - assert:
+            file: 30-assert.yaml
+
+    - name: update-monitoring-credentials
+      timeouts:
+        exec: 2m
+      try:
+        - apply:
+            file: 40-update-credentials.yaml
+        - script:
+            content: |
+              kubectl annotate monitoringconfig/test-pmm -n "$NAMESPACE" test.openeverest.io/reconcile="$(date +%s)" --overwrite
+              for i in $(seq 1 30); do
+                token=$(kubectl get secret/ps-mon-secrets -n "$NAMESPACE" -o jsonpath='{.data.pmmservertoken}' 2>/dev/null || true)
+                if [ "$token" = "YXNkZmcxMjM=" ]; then
+                  exit 0
+                fi
+                sleep 1
+              done
+              echo "pmmservertoken was not updated" >&2
+              exit 1
+        - assert:
+            file: 40-assert.yaml
+
+    - name: disable-monitoring
+      try:
+        - apply:
+            file: 50-disable-monitoring.yaml
+        - assert:
+            file: 50-assert.yaml
+
+    - name: delete-cluster
+      try:
+        - script:
+            content: |
+              kubectl -n "$NAMESPACE" delete instance/ps-mon ps.ps.percona.com/ps-mon --wait=false --ignore-not-found
+              sleep 5
+              kubectl -n "$NAMESPACE" get ps.ps.percona.com,pvc -o name 2>/dev/null | while read -r r; do
+                kubectl -n "$NAMESPACE" patch "$r" --type merge -p '{"metadata":{"finalizers":[]}}' || true
+              done
+        - wait:
+            timeout: 2m
+            apiVersion: core.openeverest.io/v1alpha1
+            kind: Instance
+            name: ps-mon
+            for:
+              deletion: {}
+        - wait:
+            timeout: 2m
+            apiVersion: ps.percona.com/v1
+            kind: PerconaServerMySQL
+            name: ps-mon
+            for:
+              deletion: {}
+

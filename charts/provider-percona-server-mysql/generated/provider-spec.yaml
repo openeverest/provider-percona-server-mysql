@@ -40,6 +40,13 @@ spec:
       versions:
         - image: percona/percona-orchestrator:3.2.6-22
           version: 3.2.6-22
+    pmm:
+      defaultVersion: 3.8.0
+      versions:
+        - image: percona/pmm-client:2.44.1-1
+          version: 2.44.1-1
+        - image: percona/pmm-client:3.8.0
+          version: 3.8.0
     router:
       defaultVersion: 8.4.10-10.1
       versions:
@@ -57,6 +64,14 @@ spec:
       type: backup
     engine:
       type: mysql
+    monitoring:
+      parametersSchema:
+        openAPIV3Schema:
+          properties:
+            monitoringConfigName:
+              type: string
+          type: object
+      type: pmm
     orchestrator:
       type: orchestrator
     proxy:
@@ -68,6 +83,8 @@ spec:
     async:
       components:
         engine: {}
+        monitoring:
+          optional: true
         orchestrator:
           optional: true
         proxy:
@@ -75,6 +92,8 @@ spec:
     groupreplication:
       components:
         engine: {}
+        monitoring:
+          optional: true
         proxy:
           optional: true
   uiSchema:
@@ -100,6 +119,18 @@ spec:
                 required: true
           description: Provide the database version for your new database.
           label: Database Version
+        monitoring:
+          components:
+            monitoring:
+              dataSource:
+                provider: monitoringConfigs
+              fieldParams:
+                displayEmpty: true
+                label: Monitoring endpoint
+              path: spec.components.monitoring.parameters.monitoringConfigName
+              uiType: select
+          description: Attach a MonitoringConfig to collect metrics.
+          label: Monitoring
         orchestrator:
           components:
             orchestratorNodes:
@@ -270,6 +301,7 @@ spec:
       sectionsOrder:
         - databaseVersion
         - resources
+        - monitoring
         - orchestrator
         - proxy
     groupreplication:
@@ -294,6 +326,18 @@ spec:
                 required: true
           description: Provide the database version for your new database.
           label: Database Version
+        monitoring:
+          components:
+            monitoring:
+              dataSource:
+                provider: monitoringConfigs
+              fieldParams:
+                displayEmpty: true
+                label: Monitoring endpoint
+              path: spec.components.monitoring.parameters.monitoringConfigName
+              uiType: select
+          description: Attach a MonitoringConfig to collect metrics.
+          label: Monitoring
         proxy:
           components:
             proxyLimits:
@@ -452,41 +496,51 @@ spec:
       sectionsOrder:
         - databaseVersion
         - resources
+        - monitoring
         - proxy
   versions:
     - components:
         backup: 8.0.35-36.1
         engine: 8.0.40-31
+        monitoring: 3.8.0
       name: 8.0.40-31
     - components:
         backup: 8.0.35-36.1
         engine: 8.0.42-33
+        monitoring: 3.8.0
       name: 8.0.42-33
     - components:
         backup: 8.0.35-36.1
         engine: 8.0.43-34.1
+        monitoring: 3.8.0
       name: 8.0.43-34.1
     - components:
         backup: 8.0.35-36.1
         engine: 8.0.45-36.1
+        monitoring: 3.8.0
       name: 8.0.45-36.1
     - components:
         backup: 8.0.35-36.1
         engine: 8.0.46-37.1
+        monitoring: 3.8.0
       name: 8.0.46-37.1
     - components:
         backup: 8.4.0-6.1
         engine: 8.4.5-5
+        monitoring: 3.8.0
       name: 8.4.5-5
     - components:
         backup: 8.4.0-6.1
         engine: 8.4.6-6.1
+        monitoring: 3.8.0
       name: 8.4.6-6.1
     - components:
         backup: 8.4.0-6.1
         engine: 8.4.8-8.1
+        monitoring: 3.8.0
       name: 8.4.8-8.1
     - components:
         backup: 8.4.0-6.1
         engine: 8.4.10-10.1
+        monitoring: 3.8.0
       name: 8.4.10-10.1

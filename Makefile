@@ -168,6 +168,14 @@ test-integration-backup: ## Run backup integration tests.
 test-integration-backup-datasource: ## Run backup datasource integration tests.
 	. ./test/vars.sh && chainsaw test --config ./test/integration/.chainsaw.yaml ./test/integration/backup/datasource
 
+.PHONY: test-integration-monitoring-pmm
+test-integration-monitoring-pmm: ## Run PMM integration tests.
+	. ./test/vars.sh && chainsaw test --config ./test/integration/.chainsaw.yaml ./test/integration/monitoring
+
+.PHONY: test-e2e-cluster
+test-e2e-cluster: ## Run E2E cluster tests (requires the PS operator).
+	. ./test/vars.sh && chainsaw test --config ./test/e2e-cluster/.chainsaw.yaml ./test/e2e-cluster
+
 .PHONY: test-integration-env-up
 test-integration-env-up: openeverest-checkout ## Bootstrap the local environment for integration tests.
 	$(MAKE) k3d-cluster-up

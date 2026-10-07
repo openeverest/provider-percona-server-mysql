@@ -22,6 +22,8 @@ config:
             defaults:
                 type: haproxy
                 replicas: 2
+        monitoring:
+            optional: true
 ui:
     sections:
         databaseVersion:
@@ -120,6 +122,18 @@ ui:
             - diskSize
             - resourcesLimits
             - resourcesRequests
+        monitoring:
+          label: "Monitoring"
+          description: "Attach a MonitoringConfig to collect metrics."
+          components:
+            monitoring:
+              uiType: select
+              path: spec.components.monitoring.parameters.monitoringConfigName
+              fieldParams:
+                label: "Monitoring endpoint"
+                displayEmpty: true
+              dataSource:
+                provider: monitoringConfigs
         orchestrator:
           label: "Orchestrator"
           description: "Configure Orchestrator for async clusters."
@@ -215,5 +229,6 @@ ui:
     sectionsOrder:
         - databaseVersion
         - resources
+        - monitoring
         - orchestrator
         - proxy

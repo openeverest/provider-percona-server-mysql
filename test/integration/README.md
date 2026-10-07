@@ -18,12 +18,17 @@ test/
     .chainsaw.yaml             # Shared chainsaw configuration (timeouts, reports)
     core/cluster/              # Create, scale, affinity, Service type, delete
     backup/datasource/         # Backup and in-place restore (operator status simulated)
+    monitoring/pmm/            # PMM MonitoringConfig mapped onto spec.pmm
   e2e-cluster/
     datasource/backup/         # Real operator backup/restore against SeaweedFS
+    monitoring/pmm/            # Real operator: spec.pmm and pmmservertoken
 ```
 
-PMM monitoring is not covered. This provider does not map a monitoring component
-onto the operator CR.
+PMM monitoring is covered by `monitoring/pmm`. The provider maps the optional
+`monitoring` component onto `PerconaServerMySQL.spec.pmm` and copies the
+MonitoringConfig API key into the users secret as `pmmservertoken`. Integration
+tests pre-create `<name>-secrets` because the operator is scaled to 0. The e2e
+suite lets the operator create that secret.
 
 ## Running locally
 
@@ -32,15 +37,17 @@ make test-integration-env-up
 make test-integration
 make test-integration-core
 make test-integration-backup
+make test-integration-monitoring-pmm
 make test-integration-env-down
 ```
 
-E2E cluster tests need the operator running (`make deploy-provider-e2e`) and
-SeaweedFS (`kubectl apply -f dev/resources/seaweedfs.yaml`):
+E2E cluster tests need the operator running (`make deploy-provider-e2e`). Backup
+suites also need SeaweedFS (`kubectl apply -f dev/resources/seaweedfs.yaml`):
 
 ```bash
 make test-e2e-cluster
 make test-e2e-cluster-datasource-backup
+make test-e2e-cluster-monitoring-pmm
 ```
 
 ## Running in CI

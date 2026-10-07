@@ -7,38 +7,47 @@ versions:
     - components:
         engine: 8.0.40-31
         backup: 8.0.35-36.1
+        monitoring: "3.8.0"
       name: 8.0.40-31
     - components:
         engine: 8.0.42-33
         backup: 8.0.35-36.1
+        monitoring: "3.8.0"
       name: 8.0.42-33
     - components:
         engine: 8.0.43-34.1
         backup: 8.0.35-36.1
+        monitoring: "3.8.0"
       name: 8.0.43-34.1
     - components:
         engine: 8.0.45-36.1
         backup: 8.0.35-36.1
+        monitoring: "3.8.0"
       name: 8.0.45-36.1
     - components:
         engine: 8.0.46-37.1
         backup: 8.0.35-36.1
+        monitoring: "3.8.0"
       name: 8.0.46-37.1
     - components:
         engine: 8.4.5-5
         backup: 8.4.0-6.1
+        monitoring: "3.8.0"
       name: 8.4.5-5
     - components:
         engine: 8.4.6-6.1
         backup: 8.4.0-6.1
+        monitoring: "3.8.0"
       name: 8.4.6-6.1
     - components:
         engine: 8.4.8-8.1
         backup: 8.4.0-6.1
+        monitoring: "3.8.0"
       name: 8.4.8-8.1
     - components:
         engine: 8.4.10-10.1
         backup: 8.4.0-6.1
+        monitoring: "3.8.0"
       name: 8.4.10-10.1
 
 componentTypes:
@@ -104,3 +113,10 @@ componentTypes:
               version: 8.0.35-36.1
             - image: percona/percona-xtrabackup:8.4.0-6.1
               version: 8.4.0-6.1
+    pmm:
+        defaultVersion: "3.8.0"
+        versions:
+            - image: percona/pmm-client:2.44.1-1
+              version: "2.44.1-1"
+            - image: percona/pmm-client:3.8.0
+              version: "3.8.0"

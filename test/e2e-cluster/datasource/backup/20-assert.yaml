@@ -14,3 +14,19 @@ spec:
     - percona-server-mysql
   providerManaged:
     supportsPITR: false
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mc-pmm-secret
+---
+apiVersion: monitoring.openeverest.io/v1alpha1
+kind: MonitoringConfig
+metadata:
+  name: mc-pmm
+spec:
+  type: pmm
+  pmm:
+    credentialsSecretRef:
+      name: mc-pmm-secret
+    url: https://pmm-server.pmm.svc
