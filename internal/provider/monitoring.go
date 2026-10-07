@@ -77,7 +77,11 @@ func applyMonitoringSettings(c *controller.Context, cluster *psv1.PerconaServerM
 	if secretsName == "" {
 		secretsName = c.Name() + "-secrets"
 	}
-	if err := syncPMMCredentials(c, monitoringCfg.Spec.PMM.CredentialsSecretRef.Name, secretsName); err != nil {
+	// The operator enables PMM only when pmmservertoken matches in the users
+	// secret and internal-<name>. A mismatch is treated as a password change
+	// and, on async, resolved via Orchestrator. This topology may not run
+	// Orchestrator, so keep both secrets in sync here.
+	if err := syncPMMCredentials(c, monitoringCfg.Spec.PMM.CredentialsSecretRef.Name, secretsName, cluster.InternalSecretName()); err != nil {
 		return err
 	}
 
@@ -128,7 +132,7 @@ func pmmServerHostFromURL(rawURL string) (string, error) {
 	return u.Host, nil
 }
 
-func syncPMMCredentials(c *controller.Context, credentialsSecretName, usersSecretName string) error {
+func syncPMMCredentials(c *controller.Context, credentialsSecretName string, secretNames ...string) error {
 	credentialsSecret := &corev1.Secret{}
 	if err := c.Client().Get(c.Context(), client.ObjectKey{Namespace: c.Namespace(), Name: credentialsSecretName}, credentialsSecret); err != nil {
 		return fmt.Errorf("get PMM credentials Secret %q: %w", credentialsSecretName, err)
@@ -138,31 +142,36 @@ func syncPMMCredentials(c *controller.Context, credentialsSecretName, usersSecre
 		return fmt.Errorf("PMM credentials Secret %q must contain non-empty %q key", credentialsSecretName, monitoringConfigAPIKeyKey)
 	}
 
-	usersSecret := &corev1.Secret{}
-	if err := c.Client().Get(c.Context(), client.ObjectKey{Namespace: c.Namespace(), Name: usersSecretName}, usersSecret); err != nil {
+	for _, secretName := range secretNames {
+		if err := ensurePMMToken(c, secretName, apiKey); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ensurePMMToken(c *controller.Context, secretName string, apiKey []byte) error {
+	secret := &corev1.Secret{}
+	if err := c.Client().Get(c.Context(), client.ObjectKey{Namespace: c.Namespace(), Name: secretName}, secret); err != nil {
 		if apierrors.IsNotFound(err) {
-			// The operator creates this secret; retry on next reconcile when it appears.
+			// The operator creates these secrets; retry on the next reconcile.
 			return nil
 		}
-		return fmt.Errorf("get users Secret %q: %w", usersSecretName, err)
+		return fmt.Errorf("get PMM users Secret %q: %w", secretName, err)
 	}
 
-	hasDesired := false
-	if usersSecret.Data != nil {
-		_, hasDesired = usersSecret.Data[psPMMServerToken]
-	}
-	if hasDesired && bytes.Equal(usersSecret.Data[psPMMServerToken], apiKey) {
+	if secret.Data != nil && bytes.Equal(secret.Data[psPMMServerToken], apiKey) {
 		return nil
 	}
 
-	orig := usersSecret.DeepCopy()
-	if usersSecret.Data == nil {
-		usersSecret.Data = map[string][]byte{}
+	orig := secret.DeepCopy()
+	if secret.Data == nil {
+		secret.Data = map[string][]byte{}
 	}
-	usersSecret.Data[psPMMServerToken] = append([]byte(nil), apiKey...)
+	secret.Data[psPMMServerToken] = append([]byte(nil), apiKey...)
 
-	if err := c.Client().Patch(c.Context(), usersSecret, client.MergeFrom(orig)); err != nil {
-		return fmt.Errorf("sync PMM credentials to Secret %q: %w", usersSecretName, err)
+	if err := c.Client().Patch(c.Context(), secret, client.MergeFrom(orig)); err != nil {
+		return fmt.Errorf("sync PMM credentials to Secret %q: %w", secretName, err)
 	}
 
 	return nil
