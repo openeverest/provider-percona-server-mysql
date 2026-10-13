@@ -66,10 +66,10 @@ provider itself is covered under [Installation](#installation).
 
 | Capability | Status | Notes |
 |---|---|---|
-| Provisioning | ❌ | |
-| Horizontal scaling | ❌ | |
-| Vertical scaling (CPU / memory) | ❌ | |
-| Version upgrades | ❌ | |
+| Provisioning | ✅ | `async` and `groupreplication` topologies |
+| Horizontal scaling | ✅ | Engine, proxy, and orchestrator replica counts |
+| Vertical scaling (CPU / memory) | ✅ | Requests and limits on the engine and proxy |
+| Version upgrades | ❌ | Version is selected at create time |
 | Custom configuration | ❌ | |
 | Monitoring | ✅ | PMM, via the optional `monitoring` component |
 | TLS | ❌ | |
@@ -78,12 +78,12 @@ Stateful workloads additionally report:
 
 | Capability | Status | Notes |
 |---|---|---|
-| Persistent storage | ❌ | |
-| Storage expansion | ❌ | |
-| Backups (on demand) | ❌ | |
-| Backups (scheduled) | ❌ | |
+| Persistent storage | ✅ | PVC size and storage class on the engine |
+| Storage expansion | ✅ | Increase `engine.storage.size`; the StorageClass must allow expansion |
+| Backups (on demand) | ✅ | Full and incremental backups to S3 |
+| Backups (scheduled) | ✅ | Cron schedules with retention, S3 only |
 | Point-in-time recovery | ❌ | |
-| Restore | ❌ | |
+| Restore | ✅ | From a backup of the same instance; not point-in-time |
 
 ## Installation
 
