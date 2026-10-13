@@ -114,9 +114,9 @@ componentTypes:
             - image: percona/percona-xtrabackup:8.4.0-6.1
               version: 8.4.0-6.1
     pmm:
-        defaultVersion: "3.8.0"
+        defaultVersion: "3.8.1"
         versions:
             - image: percona/pmm-client:2.44.1-1
               version: "2.44.1-1"
-            - image: percona/pmm-client:3.8.0
-              version: "3.8.0"
+            - image: percona/pmm-client:3.8.1
+              version: "3.8.1"

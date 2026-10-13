@@ -6,7 +6,7 @@ spec:
   pmm:
     enabled: true
     serverHost: pmm-server.pmm.svc
-    image: percona/pmm-client:3.8.0
+    image: percona/pmm-client:3.8.1
     customClusterName: ps-src
     imagePullPolicy: IfNotPresent
 status:
