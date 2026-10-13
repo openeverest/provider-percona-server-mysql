@@ -33,3 +33,17 @@ type PMMParameters struct {
 	// If not specified, monitoring will not be configured.
 	MonitoringConfigName *string `json:"monitoringConfigName,omitempty"`
 }
+
+// MysqlParameters defines custom parameters for mysql components.
+type MysqlParameters struct {
+	// Configuration allows specifying custom MySQL configuration
+	// parameters as a YAML document of flat key/value pairs, e.g.:
+	//
+	//   max_connections: "500"
+	//   innodb_buffer_pool_size: 1G
+	//   innodb_flush_log_at_trx_commit: 2
+	//
+	// applied on top of, and overrides, the operator's built-in defaults.
+	// +optional
+	Configuration string `json:"configuration,omitempty"`
+}

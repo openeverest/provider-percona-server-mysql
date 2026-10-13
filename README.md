@@ -66,11 +66,11 @@ provider itself is covered under [Installation](#installation).
 
 | Capability | Status | Notes |
 |---|---|---|
-| Provisioning | ❌ | |
-| Horizontal scaling | ❌ | |
-| Vertical scaling (CPU / memory) | ❌ | |
-| Version upgrades | ❌ | |
-| Custom configuration | ❌ | |
+| Provisioning | ✅ | `async` and `groupreplication` topologies |
+| Horizontal scaling | ✅ | Engine, proxy, and orchestrator replica counts |
+| Vertical scaling (CPU / memory) | ✅ | Requests and limits on the engine and proxy |
+| Version upgrades | ❌ | Version is selected at create time |
+| Custom configuration | ✅ | `spec.components.engine.parameters.configuration` — see [Custom MySQL configuration](#custom-mysql-configuration) |
 | Monitoring | ✅ | PMM, via the optional `monitoring` component |
 | TLS | ❌ | |
 
@@ -78,12 +78,12 @@ Stateful workloads additionally report:
 
 | Capability | Status | Notes |
 |---|---|---|
-| Persistent storage | ❌ | |
-| Storage expansion | ❌ | |
-| Backups (on demand) | ❌ | |
-| Backups (scheduled) | ❌ | |
+| Persistent storage | ✅ | PVC size and storage class on the engine |
+| Storage expansion | ✅ | Increase `engine.storage.size`; the StorageClass must allow expansion |
+| Backups (on demand) | ✅ | Full and incremental backups to S3 |
+| Backups (scheduled) | ✅ | Cron schedules with retention, S3 only |
 | Point-in-time recovery | ❌ | |
-| Restore | ❌ | |
+| Restore | ✅ | From a backup of the same instance; not point-in-time |
 
 ## Installation
 
@@ -185,7 +185,29 @@ Source of truth: [definition/versions.yaml](definition/versions.yaml).
   (`kubectl get provider percona-server-mysql -o yaml`). The API server and the UI validate
   user input against these schemas.
 
-<!-- TODO(provider): call out the technology-specific knobs worth knowing about. -->
+This provider currently exposes one technology-specific parameter beyond the shared
+component fields (replicas, resources, storage): `engine.parameters.configuration`,
+covered in [Custom MySQL configuration](#custom-mysql-configuration).
+
+## Custom MySQL configuration
+
+`spec.components.engine.parameters.configuration` is a YAML document of flat
+MySQL parameter key/value pairs. The provider writes them onto the operator
+cluster as `spec.mysql.configuration`, which overrides the operator defaults.
+
+```yaml
+spec:
+  components:
+    engine:
+      type: mysql
+      parameters:
+        configuration: |
+          max_connections: "500"
+          innodb_buffer_pool_size: 1G
+          innodb_flush_log_at_trx_commit: 2
+```
+
+See [examples/instance-custom-config.yaml](examples/instance-custom-config.yaml).
 
 ## Development
 
