@@ -31,7 +31,7 @@ spec:
   pmm:
     enabled: true
     serverHost: pmm.example.invalid
-    image: percona/pmm-client:3.8.0
+    image: percona/pmm-client:3.8.1
     customClusterName: test-ps-cluster
     imagePullPolicy: IfNotPresent
 ---
