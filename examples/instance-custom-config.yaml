@@ -1,0 +1,22 @@
+# Example: custom MySQL configuration overrides.
+#
+# spec.components.engine.parameters.configuration accepts a YAML
+# document of MySQL parameter key/value pairs.
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: my-database-custom-config
+spec:
+  providerRef:
+    name: percona-server-mysql
+  components:
+    engine:
+      type: mysql
+      replicas: 3
+      storage:
+        size: 10Gi
+      parameters:
+        configuration: |
+          max_connections: "500"
+          innodb_buffer_pool_size: 1G
+          innodb_flush_log_at_trx_commit: 2

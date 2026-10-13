@@ -199,6 +199,10 @@ func (p *Provider) Sync(c *controller.Context) error {
 
 	applySchedulingPolicy(&cluster.Spec.MySQL.PodSpec, engine.SchedulingPolicy)
 
+	if err := applyEngineConfiguration(cluster, engine); err != nil {
+		return fmt.Errorf("apply engine configuration: %w", err)
+	}
+
 	topologyType := effectiveTopologyType(c.Instance())
 
 	switch topologyType {

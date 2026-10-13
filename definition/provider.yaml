@@ -5,6 +5,7 @@
 components:
     engine:
         type: mysql
+        parametersSchema: MysqlParameters
     orchestrator:
         type: orchestrator
     proxy:

@@ -63,6 +63,12 @@ spec:
     backup:
       type: backup
     engine:
+      parametersSchema:
+        openAPIV3Schema:
+          properties:
+            configuration:
+              type: string
+          type: object
       type: mysql
     monitoring:
       parametersSchema:
@@ -99,6 +105,28 @@ spec:
   uiSchema:
     async:
       sections:
+        advanced:
+          components:
+            configuration:
+              fieldParams:
+                label: Custom MySQL configuration
+                maxRows: 8
+                minRows: 3
+                multiline: true
+                placeholder: |
+                  max_connections: "500"
+                  innodb_buffer_pool_size: 1G
+                  innodb_flush_log_at_trx_commit: 2
+              path: spec.components.engine.parameters.configuration
+              uiType: text
+              validation:
+                regex:
+                  message: 'Each line must be a "parameter: value" pair (or a # comment), e.g. max_connections: "500"'
+                  pattern: ^([ \t]*(#.*)?|[ \t]*[A-Za-z_][\w.]*[ \t]*:.*)(\r?\n([ \t]*(#.*)?|[ \t]*[A-Za-z_][\w.]*[ \t]*:.*))*[ \t\r\n]*$
+          componentsOrder:
+            - configuration
+          description: Fine-tune MySQL by overriding its default configuration parameters.
+          label: Advanced Configuration
         databaseVersion:
           components:
             version:
@@ -304,8 +332,31 @@ spec:
         - monitoring
         - orchestrator
         - proxy
+        - advanced
     groupreplication:
       sections:
+        advanced:
+          components:
+            configuration:
+              fieldParams:
+                label: Custom MySQL configuration
+                maxRows: 8
+                minRows: 3
+                multiline: true
+                placeholder: |
+                  max_connections: "500"
+                  innodb_buffer_pool_size: 1G
+                  innodb_flush_log_at_trx_commit: 2
+              path: spec.components.engine.parameters.configuration
+              uiType: text
+              validation:
+                regex:
+                  message: 'Each line must be a "parameter: value" pair (or a # comment), e.g. max_connections: "500"'
+                  pattern: ^([ \t]*(#.*)?|[ \t]*[A-Za-z_][\w.]*[ \t]*:.*)(\r?\n([ \t]*(#.*)?|[ \t]*[A-Za-z_][\w.]*[ \t]*:.*))*[ \t\r\n]*$
+          componentsOrder:
+            - configuration
+          description: Fine-tune MySQL by overriding its default configuration parameters.
+          label: Advanced Configuration
         databaseVersion:
           components:
             version:
@@ -498,6 +549,7 @@ spec:
         - resources
         - monitoring
         - proxy
+        - advanced
   versions:
     - components:
         backup: 8.0.35-36.1
