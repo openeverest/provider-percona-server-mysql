@@ -20,10 +20,6 @@ spec:
     spec:
       containers:
         - name: pmm-server
-          # pmm-server is published for linux/amd64 only (no arm64 build).
-          # Pinning to the amd64 manifest digest bypasses the runtime's
-          # platform matching so it runs natively on amd64 (CI) and under
-          # emulation on arm64 (e.g. Apple Silicon via Docker Desktop QEMU).
           image: percona/pmm-server:3.9.0@sha256:860ea9ccf3381b8a0a19316704e0de7f15c1906c9ffe5faaaafffe90f63d6c64
           ports:
             - containerPort: 8443
