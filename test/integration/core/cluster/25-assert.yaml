@@ -27,7 +27,7 @@ metadata:
 spec:
   mysql:
     size: 5
-    configuration: |
+    configuration: |-
       innodb_buffer_pool_size="1G"
       innodb_flush_log_at_trx_commit=2
       max_connections="500"
