@@ -7,7 +7,8 @@ spec:
   description: |
     Percona Server for MySQL Instance lifecycle: create a 3-node group-replication
     cluster, report Ready from simulated operator status, scale, apply affinity
-    and Service type updates, switch to a single-node topology, and delete cleanly.
+    and Service type updates, apply a custom MySQL configuration, switch to a
+    single-node topology, and delete cleanly.
     The Percona operator is scaled to 0 so status is simulated, matching other
     integration suites.
   catch:
@@ -118,6 +119,19 @@ spec:
                 -p "{\"status\":{\"state\":\"ready\",\"host\":\"test-ps-cluster-haproxy.${NAMESPACE}.svc.cluster.local\",\"mysql\":{\"size\":5,\"ready\":5,\"state\":\"ready\"},\"haproxy\":{\"size\":1,\"ready\":1,\"state\":\"ready\"}}}"
         - assert:
             file: 24-assert.yaml
+
+    - name: update-custom-config
+      try:
+        - apply:
+            file: 25-update-cluster-config.yaml
+        - script:
+            content: |
+              kubectl wait ps.ps.percona.com/test-ps-cluster -n "$NAMESPACE" \
+                --for=jsonpath='{.spec.mysql.configuration}' --timeout=30s
+              kubectl patch ps.ps.percona.com/test-ps-cluster --subresource status -n "$NAMESPACE" --type=merge \
+                -p "{\"status\":{\"state\":\"ready\",\"host\":\"test-ps-cluster-haproxy.${NAMESPACE}.svc.cluster.local\",\"mysql\":{\"size\":5,\"ready\":5,\"state\":\"ready\"},\"haproxy\":{\"size\":1,\"ready\":1,\"state\":\"ready\"}}}"
+        - assert:
+            file: 25-assert.yaml
 
     - name: create-single-node-cluster
       try:
