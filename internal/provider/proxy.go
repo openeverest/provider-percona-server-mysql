@@ -1,9 +1,11 @@
 package provider
 
 import (
+	"encoding/json"
 	"fmt"
 
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
+	"github.com/openeverest/provider-percona-server-mysql/definition/components"
 	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
 
 	"github.com/openeverest/provider-percona-server-mysql/internal/common"
@@ -55,6 +57,23 @@ func validateProxy(inst *corev1alpha1.Instance) error {
 	return nil
 }
 
+// proxyConfigurationFromComponent extracts the raw proxy configuration text
+// from a component's parameters, if any. Unlike the mysql component's
+// configuration, this is passed through verbatim rather than parsed as a
+// YAML key/value document, since the operator applies it as raw config
+// file content (haproxy.cfg or mysqlrouter.conf).
+func proxyConfigurationFromComponent(proxy corev1alpha1.ComponentSpec) (string, error) {
+	if proxy.Parameters == nil || len(proxy.Parameters.Raw) == 0 {
+		return "", nil
+	}
+
+	params := &components.ProxyParameters{}
+	if err := json.Unmarshal(proxy.Parameters.Raw, params); err != nil {
+		return "", fmt.Errorf("decode %q component parameters: %w", common.ComponentProxy, err)
+	}
+	return params.Configuration, nil
+}
+
 // applyProxy maps Instance.spec.components.proxy onto the operator CR.
 // HAProxy and Router cannot both be enabled. Omitting the component on async
 // or group-replication sets unsafeFlags.proxy so the operator accepts no proxy.
@@ -80,6 +99,12 @@ func applyProxy(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance, spec *
 	}
 
 	pod := componentPodSpec(proxy, image, defaultProxySize)
+	configuration, err := proxyConfigurationFromComponent(proxy)
+	if err != nil {
+		return err
+	}
+	pod.Configuration = configuration
+
 	var expose psv1.ServiceExpose
 	if proxy.Service != nil {
 		expose = serviceExposeFromComponent(proxy.Service)

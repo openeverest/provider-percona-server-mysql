@@ -1,14 +1,26 @@
 package provider
 
 import (
+	"encoding/json"
 	"testing"
 
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
 	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/openeverest/provider-percona-server-mysql/internal/common"
 )
+
+func proxyWithConfiguration(t *testing.T, configuration string) *runtime.RawExtension {
+	t.Helper()
+
+	raw, err := json.Marshal(map[string]any{"configuration": configuration})
+	if err != nil {
+		t.Fatalf("marshal configuration: %v", err)
+	}
+	return &runtime.RawExtension{Raw: raw}
+}
 
 func TestValidateProxy(t *testing.T) {
 	t.Parallel()
@@ -236,6 +248,54 @@ func TestApplyProxy(t *testing.T) {
 		}
 		if cr.Spec.Unsafe.ProxySize {
 			t.Fatal("haproxy has no minimum size in the operator; unsafeFlags.proxySize must stay false")
+		}
+	})
+
+	t.Run("haproxy configuration is passed through verbatim", func(t *testing.T) {
+		t.Parallel()
+		cr := &psv1.PerconaServerMySQL{}
+		inst := instanceWithTopology(common.TopologyAsync, map[string]corev1alpha1.ComponentSpec{
+			common.ComponentProxy: {
+				Type:       common.ProxyTypeHAProxy,
+				Parameters: proxyWithConfiguration(t, "timeout client 30s\n"),
+			},
+		})
+		if err := applyProxy(cr, inst, spec); err != nil {
+			t.Fatal(err)
+		}
+		if cr.Spec.Proxy.HAProxy.Configuration != "timeout client 30s\n" {
+			t.Fatalf("configuration = %q", cr.Spec.Proxy.HAProxy.Configuration)
+		}
+	})
+
+	t.Run("router configuration is passed through verbatim", func(t *testing.T) {
+		t.Parallel()
+		cr := &psv1.PerconaServerMySQL{}
+		inst := instanceWithTopology(common.TopologyGroupReplication, map[string]corev1alpha1.ComponentSpec{
+			common.ComponentProxy: {
+				Type:       common.ProxyTypeRouter,
+				Parameters: proxyWithConfiguration(t, "[DEFAULT]\nmax_total_connections=512\n"),
+			},
+		})
+		if err := applyProxy(cr, inst, spec); err != nil {
+			t.Fatal(err)
+		}
+		if cr.Spec.Proxy.Router.Configuration != "[DEFAULT]\nmax_total_connections=512\n" {
+			t.Fatalf("configuration = %q", cr.Spec.Proxy.Router.Configuration)
+		}
+	})
+
+	t.Run("no parameters leaves configuration empty", func(t *testing.T) {
+		t.Parallel()
+		cr := &psv1.PerconaServerMySQL{}
+		inst := instanceWithTopology(common.TopologyAsync, map[string]corev1alpha1.ComponentSpec{
+			common.ComponentProxy: {Type: common.ProxyTypeHAProxy},
+		})
+		if err := applyProxy(cr, inst, spec); err != nil {
+			t.Fatal(err)
+		}
+		if cr.Spec.Proxy.HAProxy.Configuration != "" {
+			t.Fatalf("configuration = %q, want empty", cr.Spec.Proxy.HAProxy.Configuration)
 		}
 	})
 }

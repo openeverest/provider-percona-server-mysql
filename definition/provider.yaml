@@ -10,6 +10,7 @@ components:
         type: orchestrator
     proxy:
         type: haproxy
+        parametersSchema: ProxyParameters
     # backup is not a structural component (it never appears in any
     # topology's config.components and users never set
     # spec.components.backup): it exists solely so version bundles can pin

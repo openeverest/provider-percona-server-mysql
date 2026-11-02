@@ -205,11 +205,23 @@ ui:
                     regex:
                       pattern: '^[0-9]+(\.[0-9]+)?(Ki|Mi|Gi|Ti|Pi|Ei)$'
                       message: "Invalid memory value. Use a number followed by a unit: Ki, Mi, Gi, Ti, Pi, or Ei (e.g. 128Mi, 1Gi). A unit is required."
+            proxyConfiguration:
+              uiType: text
+              path: spec.components.proxy.parameters.configuration
+              fieldParams:
+                label: Custom proxy configuration
+                placeholder: |
+                  # HAProxy config snippet, or MySQL Router .conf
+                  # section, depending on the selected proxy type.
+                multiline: true
+                minRows: 3
+                maxRows: 8
           componentsOrder:
             - proxyType
             - proxyNodes
             - proxyLimits
             - proxyRequests
+            - proxyConfiguration
         advanced:
           label: Advanced Configuration
           description: Fine-tune MySQL by overriding its default configuration parameters.
