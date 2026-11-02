@@ -81,6 +81,12 @@ spec:
     orchestrator:
       type: orchestrator
     proxy:
+      parametersSchema:
+        openAPIV3Schema:
+          properties:
+            configuration:
+              type: string
+          type: object
       type: haproxy
   defaultVersion: 8.4.10-10.1
   release:
@@ -175,6 +181,17 @@ spec:
           label: Orchestrator
         proxy:
           components:
+            proxyConfiguration:
+              fieldParams:
+                label: Custom proxy configuration
+                maxRows: 8
+                minRows: 3
+                multiline: true
+                placeholder: |
+                  # HAProxy config snippet
+                  timeout client 30s
+              path: spec.components.proxy.parameters.configuration
+              uiType: text
             proxyLimits:
               components:
                 cpu:
@@ -249,6 +266,7 @@ spec:
             - proxyNodes
             - proxyLimits
             - proxyRequests
+            - proxyConfiguration
           description: Configure a single proxy type for the cluster.
           label: Proxy
         resources:
@@ -391,6 +409,17 @@ spec:
           label: Monitoring
         proxy:
           components:
+            proxyConfiguration:
+              fieldParams:
+                label: Custom proxy configuration
+                maxRows: 8
+                minRows: 3
+                multiline: true
+                placeholder: |
+                  # HAProxy config snippet, or MySQL Router .conf
+                  # section, depending on the selected proxy type.
+              path: spec.components.proxy.parameters.configuration
+              uiType: text
             proxyLimits:
               components:
                 cpu:
@@ -467,6 +496,7 @@ spec:
             - proxyNodes
             - proxyLimits
             - proxyRequests
+            - proxyConfiguration
           description: Configure a single proxy type for the cluster.
           label: Proxy
         resources:
