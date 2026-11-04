@@ -286,13 +286,13 @@ code generation, and the backup/restore interfaces are documented once for all p
 ### Testing
 
 - **Unit tests** — `make test-unit`.
-- **Integration tests** — chainsaw suites under `test/integration/` (`core/cluster`,
+- **Integration tests** — chainsaw suites under `test/integration/` (`core/cluster`, `core/tls`,
   `backup/datasource`, `monitoring/pmm`). The operator is scaled to 0 and status is simulated.
   See [test/integration/README.md](test/integration/README.md). Individual suites are also
   exposed as make targets (`make test-integration-core`, `make test-integration-backup`,
   `make test-integration-monitoring-pmm`).
 - **E2E cluster tests** — `test/e2e-cluster/` runs against a real PS operator
-  (`datasource/backup`, `monitoring/pmm`).
+  (`core/tls`, `datasource/backup`, `monitoring/pmm`).
   Not executed on default CI runners; use `make deploy-provider-e2e` then
   `make test-e2e-cluster` locally.
 - **CI** — `.github/workflows/ci.yaml` runs lint, build, unit tests, generated-file

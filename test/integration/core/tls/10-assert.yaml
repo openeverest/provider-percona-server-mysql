@@ -1,0 +1,16 @@
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: test-ps-tls
+spec:
+  parameters:
+    tls:
+      certificateSecretName: test-ps-tls-certs
+---
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: test-ps-tls
+spec:
+  sslSecretName: test-ps-tls-certs
+

@@ -1,0 +1,16 @@
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: test-ps-tls
+status:
+  phase: Failed
+---
+# The operator CR must keep the original certificate secret: the provider
+# must not apply the rejected change.
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: test-ps-tls
+spec:
+  sslSecretName: test-ps-tls-certs
+

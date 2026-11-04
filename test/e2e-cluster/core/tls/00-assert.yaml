@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provider-percona-server-mysql-ps-operator
+  namespace: provider-system
+spec:
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provider-percona-server-mysql
+  namespace: provider-system
+spec:
+  replicas: 1
+

@@ -1,0 +1,22 @@
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: test-ps-tls
+spec:
+  providerRef:
+    name: percona-server-mysql
+  topology:
+    type: groupreplication
+  components:
+    engine:
+      type: mysql
+      replicas: 3
+      storage:
+        size: 25Gi
+    proxy:
+      type: haproxy
+      replicas: 1
+  parameters:
+    tls:
+      certificateSecretName: test-ps-tls-certs
+
