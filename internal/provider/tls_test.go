@@ -173,7 +173,7 @@ func TestConfigureTLS(t *testing.T) {
 		if cluster.Spec.TLS == nil || cluster.Spec.TLS.IssuerConf == nil {
 			t.Fatal("TLS.IssuerConf not set")
 		}
-		want := cmmeta.ObjectReference{Name: "my-issuer", Kind: "ClusterIssuer", Group: certManagerGroup}
+		want := cmmeta.IssuerReference{Name: "my-issuer", Kind: "ClusterIssuer", Group: certManagerGroup}
 		if *cluster.Spec.TLS.IssuerConf != want {
 			t.Fatalf("IssuerConf = %+v, want %+v", *cluster.Spec.TLS.IssuerConf, want)
 		}
@@ -264,7 +264,7 @@ func TestValidateTLS(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: testInstanceName, Namespace: testNamespace},
 			Spec: psv1.PerconaServerMySQLSpec{
 				SSLSecretName: testInstanceName + "-ssl",
-				TLS:           &psv1.TLSSpec{IssuerConf: &cmmeta.ObjectReference{Name: "old-issuer", Kind: "Issuer"}},
+				TLS:           &psv1.TLSSpec{IssuerConf: &cmmeta.IssuerReference{Name: "old-issuer", Kind: "Issuer"}},
 			},
 		}
 		c := testContext(t, &definition.Parameters{
