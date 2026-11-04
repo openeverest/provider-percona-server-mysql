@@ -80,6 +80,9 @@ func (p *Provider) Validate(c *controller.Context) error {
 	if err := validateProxy(c.Instance()); err != nil {
 		return err
 	}
+	if err := validateTLS(c); err != nil {
+		return fmt.Errorf("tls validation failed: %w", err)
+	}
 
 	return nil
 }
@@ -133,10 +136,15 @@ func (p *Provider) Sync(c *controller.Context) error {
 			CRVersion: psversion.Version(),
 
 			SecretsName:    c.Name() + "-secrets",
-			SSLSecretName:  c.Name() + "-ssl",
 			UpdateStrategy: appsv1.RollingUpdateStatefulSetStrategyType,
 		},
 	}
+
+	tls, err := tlsParameters(c)
+	if err != nil {
+		return err
+	}
+	configureTLS(c, cluster, tls)
 
 	// Configure the MySQL engine.
 	engineVersion := engine.Version
@@ -314,14 +322,26 @@ func connectionDetails(
 		)
 	}
 
-	return controller.ConnectionDetails{
+	details := controller.ConnectionDetails{
 		Type:     "mysql",
 		Provider: common.ProviderName,
 		Host:     cluster.Status.Host,
 		Port:     "3306",
 		Username: string(psv1.UserRoot),
 		Password: string(password),
-	}, nil
+	}
+
+	// Clients verify the instance's certificate against this CA
+	// (the operator's own CA is not publicly trusted).
+	ca, err := tlsConnectionCA(c, cluster)
+	if err != nil {
+		return controller.ConnectionDetails{}, err
+	}
+	if len(ca) > 0 {
+		details.AdditionalProperties = map[string]string{caKey: string(ca)}
+	}
+
+	return details, nil
 }
 
 // Cleanup handles deletion of provider-managed resources.

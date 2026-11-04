@@ -89,6 +89,22 @@ spec:
           type: object
       type: haproxy
   defaultVersion: 8.4.10-10.1
+  parametersSchema:
+    openAPIV3Schema:
+      properties:
+        tls:
+          properties:
+            certificateSecretName:
+              type: string
+            issuer:
+              properties:
+                kind:
+                  type: string
+                name:
+                  type: string
+              type: object
+          type: object
+      type: object
   release:
     version: 0.1.0
   topologies:
@@ -344,12 +360,71 @@ spec:
             - resourcesRequests
           description: Configure the resources your database will have access to.
           label: Resources
+        tls:
+          components:
+            certificates:
+              components:
+                certificateSecretName:
+                  fieldParams:
+                    helperText: Secret with tls.crt, tls.key and ca.crt presented to clients and other members
+                    label: Certificate secret
+                    modes:
+                      edit:
+                        disabled: true
+                  path: spec.parameters.tls.certificateSecretName
+                  uiType: text
+                  validation:
+                    celExpressions:
+                      - celExpr: '!has(spec.parameters.tls.certificateSecretName) || spec.parameters.tls.certificateSecretName == '''' || !has(spec.parameters.tls.issuer.name) || spec.parameters.tls.issuer.name == '''''
+                        message: Use either a certificate secret or an issuer, not both
+                issuer:
+                  components:
+                    issuerKind:
+                      fieldParams:
+                        defaultValue: Issuer
+                        label: Issuer kind
+                        modes:
+                          edit:
+                            disabled: true
+                        options:
+                          - label: Issuer
+                            value: Issuer
+                          - label: ClusterIssuer
+                            value: ClusterIssuer
+                      path: spec.parameters.tls.issuer.kind
+                      uiType: select
+                    issuerName:
+                      fieldParams:
+                        helperText: Issuer that signs the certificate
+                        label: cert-manager issuer
+                        modes:
+                          edit:
+                            disabled: true
+                      path: spec.parameters.tls.issuer.name
+                      uiType: text
+                  componentsOrder:
+                    - issuerName
+                    - issuerKind
+                  groupType: line
+                  uiType: group
+              componentsOrder:
+                - certificateSecretName
+                - issuer
+              description: 'Leave empty to have a certificate issued for the instance: by cert-manager when it is installed, otherwise by a CA created for the instance. Can''t be changed after the instance is created.'
+              groupType: bordered
+              label: Certificates
+              uiType: group
+          componentsOrder:
+            - certificates
+          description: Encrypt connections to your database and between its members. The operator always encrypts these connections; this only configures where the certificate comes from.
+          label: TLS
       sectionsOrder:
         - databaseVersion
         - resources
         - monitoring
         - orchestrator
         - proxy
+        - tls
         - advanced
     groupreplication:
       sections:
@@ -574,11 +649,70 @@ spec:
             - resourcesRequests
           description: Configure the resources your database will have access to.
           label: Resources
+        tls:
+          components:
+            certificates:
+              components:
+                certificateSecretName:
+                  fieldParams:
+                    helperText: Secret with tls.crt, tls.key and ca.crt presented to clients and other members
+                    label: Certificate secret
+                    modes:
+                      edit:
+                        disabled: true
+                  path: spec.parameters.tls.certificateSecretName
+                  uiType: text
+                  validation:
+                    celExpressions:
+                      - celExpr: '!has(spec.parameters.tls.certificateSecretName) || spec.parameters.tls.certificateSecretName == '''' || !has(spec.parameters.tls.issuer.name) || spec.parameters.tls.issuer.name == '''''
+                        message: Use either a certificate secret or an issuer, not both
+                issuer:
+                  components:
+                    issuerKind:
+                      fieldParams:
+                        defaultValue: Issuer
+                        label: Issuer kind
+                        modes:
+                          edit:
+                            disabled: true
+                        options:
+                          - label: Issuer
+                            value: Issuer
+                          - label: ClusterIssuer
+                            value: ClusterIssuer
+                      path: spec.parameters.tls.issuer.kind
+                      uiType: select
+                    issuerName:
+                      fieldParams:
+                        helperText: Issuer that signs the certificate
+                        label: cert-manager issuer
+                        modes:
+                          edit:
+                            disabled: true
+                      path: spec.parameters.tls.issuer.name
+                      uiType: text
+                  componentsOrder:
+                    - issuerName
+                    - issuerKind
+                  groupType: line
+                  uiType: group
+              componentsOrder:
+                - certificateSecretName
+                - issuer
+              description: 'Leave empty to have a certificate issued for the instance: by cert-manager when it is installed, otherwise by a CA created for the instance. Can''t be changed after the instance is created.'
+              groupType: bordered
+              label: Certificates
+              uiType: group
+          componentsOrder:
+            - certificates
+          description: Encrypt connections to your database and between its members. The operator always encrypts these connections; this only configures where the certificate comes from.
+          label: TLS
       sectionsOrder:
         - databaseVersion
         - resources
         - monitoring
         - proxy
+        - tls
         - advanced
   versions:
     - components:
