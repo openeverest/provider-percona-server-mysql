@@ -126,6 +126,8 @@ func applySchedulingPolicy(ps *psv1.PodSpec, sp *commonv1alpha1.SchedulingPolicy
 	}
 	ps.NodeSelector = sp.NodeSelector
 	ps.Tolerations = sp.Tolerations
-	ps.TopologySpreadConstraints = sp.TopologySpreadConstraints
+	if sp.TopologySpreadConstraints != nil {
+		ps.TopologySpreadConstraints = *sp.TopologySpreadConstraints
+	}
 	ps.SchedulerName = sp.SchedulerName
 }

@@ -1,0 +1,10 @@
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: test-ps-admission
+spec:
+  mysql:
+    clusterType: async
+  orchestrator:
+    enabled: true
+    size: 3

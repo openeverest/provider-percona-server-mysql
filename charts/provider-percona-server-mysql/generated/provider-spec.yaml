@@ -65,16 +65,31 @@ spec:
     engine:
       parametersSchema:
         openAPIV3Schema:
+          description: MysqlParameters defines custom parameters for mysql components.
           properties:
             configuration:
+              description: |-
+                Configuration allows specifying custom MySQL configuration
+                parameters as a YAML document of flat key/value pairs, e.g.:
+
+                  max_connections: "500"
+                  innodb_buffer_pool_size: 1G
+                  innodb_flush_log_at_trx_commit: 2
+
+                applied on top of, and overrides, the operator's built-in defaults.
               type: string
           type: object
       type: mysql
     monitoring:
       parametersSchema:
         openAPIV3Schema:
+          description: PMMParameters defines structured parameters for PMM monitoring.
           properties:
             monitoringConfigName:
+              description: |-
+                MonitoringConfigName specifies the name of the MonitoringConfig resource
+                to use for configuring PMM monitoring.
+                If not specified, monitoring will not be configured.
               type: string
           type: object
       type: pmm
@@ -83,8 +98,15 @@ spec:
     proxy:
       parametersSchema:
         openAPIV3Schema:
+          description: ProxyParameters defines custom parameters for proxy components.
           properties:
             configuration:
+              description: |-
+                Configuration allows specifying custom proxy configuration as raw
+                text, passed through verbatim to the operator (HAProxy's haproxy.cfg
+                or MySQL Router's mysqlrouter.conf, depending on the selected proxy
+                type), applied on top of, and overriding, the operator's built-in
+                defaults.
               type: string
           type: object
       type: haproxy
@@ -108,6 +130,19 @@ spec:
           optional: true
         proxy:
           optional: true
+          supportedFields:
+            openAPIV3Schema:
+              properties:
+                image: {}
+                replicas: {}
+                resources: {}
+                schedulingPolicy: {}
+                service: {}
+                type:
+                  enum:
+                    - haproxy
+                    - router
+                version: {}
   uiSchema:
     async:
       sections:
@@ -145,6 +180,7 @@ spec:
                     disabled: true
                 optionsPath: spec.versions
                 optionsPathConfig:
+                  defaultValuePath: spec.defaultVersion
                   labelPath: name
                   valuePath: name
               path: spec.version
@@ -387,6 +423,7 @@ spec:
                     disabled: true
                 optionsPath: spec.versions
                 optionsPathConfig:
+                  defaultValuePath: spec.defaultVersion
                   labelPath: name
                   valuePath: name
               path: spec.version

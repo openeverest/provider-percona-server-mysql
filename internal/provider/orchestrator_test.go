@@ -5,6 +5,7 @@ import (
 
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
 	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
@@ -15,9 +16,9 @@ func TestValidateOrchestrator(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		inst    *corev1alpha1.Instance
-		wantErr bool
+		name string
+		inst *corev1alpha1.Instance
+		want []string
 	}{
 		{
 			name: "absent is ok",
@@ -52,14 +53,7 @@ func TestValidateOrchestrator(t *testing.T) {
 			inst: instanceWithTopology(common.TopologyAsync, map[string]corev1alpha1.ComponentSpec{
 				common.ComponentOrchestrator: {Replicas: ptr32(0)},
 			}),
-			wantErr: true,
-		},
-		{
-			name: "wrong type rejected",
-			inst: instanceWithTopology(common.TopologyAsync, map[string]corev1alpha1.ComponentSpec{
-				common.ComponentOrchestrator: {Type: "mysql"},
-			}),
-			wantErr: true,
+			want: []string{"spec.components[orchestrator].replicas"},
 		},
 		{
 			name: "orchestrator on group-replication is ignored",
@@ -72,13 +66,11 @@ func TestValidateOrchestrator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			err := validateOrchestrator(tt.inst)
-			if tt.wantErr && err == nil {
-				t.Fatal("expected error")
+			var got []string
+			for _, err := range validateOrchestrator(tt.inst) {
+				got = append(got, err.Field)
 			}
-			if !tt.wantErr && err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
