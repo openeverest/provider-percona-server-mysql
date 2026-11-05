@@ -66,24 +66,6 @@ func New() *Provider {
 	return p
 }
 
-// Validate checks if the Instance spec is valid.
-//
-// Add your provider-specific validation logic here.
-// Return an error if the spec is invalid.
-func (p *Provider) Validate(c *controller.Context) error {
-	l := log.FromContext(c.Context())
-	l.Info("Validating instance", "name", c.Name())
-
-	if err := validateOrchestrator(c.Instance()); err != nil {
-		return err
-	}
-	if err := validateProxy(c.Instance()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // Sync ensures all required resources exist and are configured correctly.
 //
 // This is the main reconciliation logic. Create or update your

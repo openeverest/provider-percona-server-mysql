@@ -18,6 +18,16 @@ config:
             defaults:
                 type: router
                 replicas: 2
+            # Storage is not applied to HAProxy/Router pods.
+            supportedFields:
+                properties:
+                    type: {enum: [haproxy, router]}
+                    version: {}
+                    image: {}
+                    replicas: {}
+                    resources: {}
+                    service: {}
+                    schedulingPolicy: {}
         monitoring:
             optional: true
 ui:
