@@ -17,9 +17,11 @@ test/
   integration/
     .chainsaw.yaml             # Shared chainsaw configuration (timeouts, reports)
     core/cluster/              # Create, scale, affinity, Service type, delete
+    core/tls/                  # Certificate secret wiring, CA on the connection secret, validation
     backup/datasource/         # Backup and in-place restore (operator status simulated)
     monitoring/pmm/            # PMM MonitoringConfig mapped onto spec.pmm
   e2e-cluster/
+    core/tls/                  # Real operator: self-signed cert, verify the live TLS connection
     datasource/backup/         # Real operator backup/restore against SeaweedFS
     monitoring/pmm/            # Real operator: spec.pmm and pmmservertoken
 ```
@@ -46,6 +48,7 @@ suites also need SeaweedFS (`kubectl apply -f dev/resources/seaweedfs.yaml`):
 
 ```bash
 make test-e2e-cluster
+make test-e2e-cluster-core-tls
 make test-e2e-cluster-datasource-backup
 make test-e2e-cluster-monitoring-pmm
 ```

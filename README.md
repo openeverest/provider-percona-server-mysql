@@ -73,7 +73,7 @@ provider itself is covered under [Installation](#installation).
 | Version upgrades | ❌ | Version is selected at create time |
 | Custom configuration | ✅ | `spec.components.engine.parameters.configuration` — see [Custom MySQL configuration](#custom-mysql-configuration) |
 | Monitoring | ✅ | PMM, via the optional `monitoring` component |
-| TLS | ❌ | |
+| TLS | ✅ | Always on (the operator's default); bring your own certificate secret or a cert-manager issuer — see [TLS](#tls) |
 
 Stateful workloads additionally report:
 
@@ -186,9 +186,10 @@ Source of truth: [definition/versions.yaml](definition/versions.yaml).
   (`kubectl get provider percona-server-mysql -o yaml`). The API server and the UI validate
   user input against these schemas.
 
-This provider currently exposes one technology-specific parameter beyond the shared
+This provider currently exposes two technology-specific parameters beyond the shared
 component fields (replicas, resources, storage): `engine.parameters.configuration`,
-covered in [Custom MySQL configuration](#custom-mysql-configuration).
+covered in [Custom MySQL configuration](#custom-mysql-configuration), and instance-wide
+`spec.parameters.tls`, covered in [TLS](#tls).
 
 ## Custom MySQL configuration
 
@@ -209,6 +210,40 @@ spec:
 ```
 
 See [examples/instance-custom-config.yaml](examples/instance-custom-config.yaml).
+
+## TLS
+
+The PS operator always encrypts connections between members and clients with TLS; it
+cannot be disabled. `spec.parameters.tls` only configures where the certificate comes
+from — it does not turn encryption on or off.
+
+By default the operator manages the certificate itself (via cert-manager when it is
+installed in the cluster, or else a self-signed CA it creates for the instance). You can
+instead bring your own certificate, or have the operator request one from a cert-manager
+`Issuer`/`ClusterIssuer`:
+
+```yaml
+spec:
+  parameters:
+    tls:
+      # Bring your own certificate secret (tls.crt, tls.key and ca.crt), OR:
+      certificateSecretName: my-certs
+      # have a cert-manager issuer sign it (not both):
+      # issuer:
+      #   name: my-issuer
+      #   kind: Issuer # or ClusterIssuer
+```
+
+The certificate secret, when supplied, must contain `tls.crt`, `tls.key` and `ca.crt`,
+and its subject alternative names must cover the instance's service and pod names (see
+the operator's [TLS documentation](https://docs.percona.com/percona-operator-for-mysql/ps/tls.html)).
+
+The certificate source (`certificateSecretName` or `issuer`) can only be set when the
+instance is created: a new CA later would not be trusted by members or clients already
+holding the old one.
+
+The connection secret for the instance carries the CA certificate as `ca.crt` once it has
+been issued, so clients can verify the instance's certificate.
 
 ## Development
 
@@ -251,13 +286,13 @@ code generation, and the backup/restore interfaces are documented once for all p
 ### Testing
 
 - **Unit tests** — `make test-unit`.
-- **Integration tests** — chainsaw suites under `test/integration/` (`core/cluster`,
+- **Integration tests** — chainsaw suites under `test/integration/` (`core/cluster`, `core/tls`,
   `backup/datasource`, `monitoring/pmm`). The operator is scaled to 0 and status is simulated.
   See [test/integration/README.md](test/integration/README.md). Individual suites are also
   exposed as make targets (`make test-integration-core`, `make test-integration-backup`,
   `make test-integration-monitoring-pmm`).
 - **E2E cluster tests** — `test/e2e-cluster/` runs against a real PS operator
-  (`datasource/backup`, `monitoring/pmm`).
+  (`core/tls`, `datasource/backup`, `monitoring/pmm`).
   Not executed on default CI runners; use `make deploy-provider-e2e` then
   `make test-e2e-cluster` locally.
 - **CI** — `.github/workflows/ci.yaml` runs lint, build, unit tests, generated-file
