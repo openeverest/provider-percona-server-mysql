@@ -7,10 +7,10 @@ spec:
   description: |
     TLS certificate configuration (spec.parameters.tls): a user-supplied
     certificate secret is wired onto PerconaServerMySQL.spec.sslSecretName,
-    its CA is exposed on the connection secret, the certificate source
-    cannot change on an existing instance, and invalid configurations
-    (an incomplete secret, or a secret and an issuer set together) are
-    rejected before the operator CR is ever created.
+    its CA is exposed on the connection secret, a change of the certificate
+    source on an existing instance and a secret and an issuer set together
+    are rejected at admission, and an incomplete secret keeps the operator
+    CR from ever being created.
     The Percona operator is scaled to 0 so status is simulated, matching
     other integration suites.
   catch:
@@ -30,6 +30,8 @@ spec:
               # Operator-created webhook has no endpoints once scaled to 0.
               kubectl get validatingwebhookconfiguration -o name 2>/dev/null | while read -r name; do
                 case "$name" in
+                  # The provider's own Instance webhook.
+                  *.openeverest.io) ;;
                   *percona-server-mysql*|*ps-operator*) kubectl delete "$name" --ignore-not-found ;;
                 esac
               done
@@ -67,19 +69,11 @@ spec:
             content: |
               kubectl patch instance/test-ps-tls -n "$NAMESPACE" --type=merge \
                 -p '{"spec":{"parameters":{"tls":{"certificateSecretName":"test-ps-tls-certs-2"}}}}'
+            check:
+              ($error != null): true
+              (contains($stderr, 'spec.parameters.tls.certificateSecretName')): true
         - assert:
             file: 20-assert.yaml
-
-    - name: revert-to-original-certificate-secret
-      try:
-        - script:
-            content: |
-              kubectl patch instance/test-ps-tls -n "$NAMESPACE" --type=merge \
-                -p '{"spec":{"parameters":{"tls":{"certificateSecretName":"test-ps-tls-certs"}}}}'
-              kubectl wait instance/test-ps-tls -n "$NAMESPACE" \
-                --for=condition=Ready --timeout=30s
-        - assert:
-            file: 21-assert.yaml
 
     - name: incomplete-certificate-secret-is-rejected
       try:
@@ -100,19 +94,13 @@ spec:
 
     - name: certificate-secret-and-issuer-together-is-rejected
       try:
-        - apply:
-            file: 31-create-cluster-secret-and-issuer.yaml
-        - assert:
-            file: 31-assert.yaml
         - script:
-            content: |
-              if kubectl get ps.ps.percona.com/test-ps-tls-bothset -n "$NAMESPACE" 2>/dev/null; then
-                echo "unexpected: PerconaServerMySQL test-ps-tls-bothset was created despite both certificateSecretName and issuer being set" >&2
-                exit 1
-              fi
-        - script:
-            content: |
-              kubectl -n "$NAMESPACE" delete instance/test-ps-tls-bothset --ignore-not-found --wait=true
+            content: kubectl apply -n $NAMESPACE -f 31-create-cluster-secret-and-issuer.yaml
+            check:
+              ($error != null): true
+              (contains($stderr, 'spec.parameters.tls.issuer')): true
+        - error:
+            file: 31-error.yaml
 
     - name: delete-cluster
       try:

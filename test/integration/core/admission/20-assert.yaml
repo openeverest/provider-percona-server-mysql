@@ -1,9 +1,9 @@
 apiVersion: core.openeverest.io/v1alpha1
 kind: Instance
 metadata:
-  name: test-ps-tls-bothset
+  name: test-ps-admission
 status:
   (conditions[?type == 'Ready']):
     - status: "False"
       reason: ValidationFailed
-      (contains(message, 'spec.parameters.tls.issuer')): true
+      (contains(message, 'spec.components[orchestrator].replicas')): true

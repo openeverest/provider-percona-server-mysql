@@ -1,19 +1,19 @@
+# The webhook rejected the change: the Instance and the operator CR keep the
+# original certificate secret.
 apiVersion: core.openeverest.io/v1alpha1
 kind: Instance
 metadata:
   name: test-ps-tls
+spec:
+  parameters:
+    tls:
+      certificateSecretName: test-ps-tls-certs
 status:
-  (conditions[?type == 'Ready']):
-    - status: "False"
-      reason: InvalidReference
-      (contains(message, 'spec.parameters.tls.certificateSecretName')): true
+  phase: Ready
 ---
-# The operator CR must keep the original certificate secret: the provider
-# must not apply the rejected change.
 apiVersion: ps.percona.com/v1
 kind: PerconaServerMySQL
 metadata:
   name: test-ps-tls
 spec:
   sslSecretName: test-ps-tls-certs
-
