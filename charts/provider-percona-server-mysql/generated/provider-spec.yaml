@@ -65,16 +65,31 @@ spec:
     engine:
       parametersSchema:
         openAPIV3Schema:
+          description: MysqlParameters defines custom parameters for mysql components.
           properties:
             configuration:
+              description: |-
+                Configuration allows specifying custom MySQL configuration
+                parameters as a YAML document of flat key/value pairs, e.g.:
+
+                  max_connections: "500"
+                  innodb_buffer_pool_size: 1G
+                  innodb_flush_log_at_trx_commit: 2
+
+                applied on top of, and overrides, the operator's built-in defaults.
               type: string
           type: object
       type: mysql
     monitoring:
       parametersSchema:
         openAPIV3Schema:
+          description: PMMParameters defines structured parameters for PMM monitoring.
           properties:
             monitoringConfigName:
+              description: |-
+                MonitoringConfigName specifies the name of the MonitoringConfig resource
+                to use for configuring PMM monitoring.
+                If not specified, monitoring will not be configured.
               type: string
           type: object
       type: pmm
@@ -83,24 +98,49 @@ spec:
     proxy:
       parametersSchema:
         openAPIV3Schema:
+          description: ProxyParameters defines custom parameters for proxy components.
           properties:
             configuration:
+              description: |-
+                Configuration allows specifying custom proxy configuration as raw
+                text, passed through verbatim to the operator (HAProxy's haproxy.cfg
+                or MySQL Router's mysqlrouter.conf, depending on the selected proxy
+                type), applied on top of, and overriding, the operator's built-in
+                defaults.
               type: string
           type: object
       type: haproxy
   defaultVersion: 8.4.10-10.1
   parametersSchema:
     openAPIV3Schema:
+      description: |-
+        Parameters defines instance-wide structured parameters that apply to the
+        entire cluster (Instance.spec.parameters).
       properties:
         tls:
+          description: |-
+            TLS configures the certificates used to encrypt connections to the
+            instance and between its members. The PS operator always encrypts
+            these connections; TLS cannot be disabled.
           properties:
             certificateSecretName:
+              description: |-
+                CertificateSecretName names a Secret in the instance namespace with
+                the certificate the instance presents to clients and other members:
+                tls.crt, tls.key and ca.crt. Its subject alternative names must cover
+                the instance's service and pod names.
               type: string
             issuer:
+              description: |-
+                Issuer is the cert-manager issuer that signs the instance's
+                certificate, instead of a self-signed CA created for the instance.
               properties:
                 kind:
+                  default: Issuer
+                  description: Kind of the issuer.
                   type: string
                 name:
+                  description: Name of the issuer.
                   type: string
               type: object
           type: object
@@ -124,6 +164,19 @@ spec:
           optional: true
         proxy:
           optional: true
+          supportedFields:
+            openAPIV3Schema:
+              properties:
+                image: {}
+                replicas: {}
+                resources: {}
+                schedulingPolicy: {}
+                service: {}
+                type:
+                  enum:
+                    - haproxy
+                    - router
+                version: {}
   uiSchema:
     async:
       sections:
@@ -161,6 +214,7 @@ spec:
                     disabled: true
                 optionsPath: spec.versions
                 optionsPathConfig:
+                  defaultValuePath: spec.defaultVersion
                   labelPath: name
                   valuePath: name
               path: spec.version
@@ -462,6 +516,7 @@ spec:
                     disabled: true
                 optionsPath: spec.versions
                 optionsPathConfig:
+                  defaultValuePath: spec.defaultVersion
                   labelPath: name
                   valuePath: name
               path: spec.version

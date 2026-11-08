@@ -3,10 +3,12 @@ package provider
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
 	"github.com/openeverest/provider-percona-server-mysql/definition/components"
 	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/openeverest/provider-percona-server-mysql/internal/common"
 )
@@ -35,26 +37,27 @@ func proxyTypeOf(comp corev1alpha1.ComponentSpec, topology string) string {
 // Router sizes below the operator's safe minimum on group-replication are
 // not rejected here: applyProxy sets unsafeFlags.proxySize so the operator
 // accepts them, mirroring how mysqlSizeRequiresUnsafe handles MySQL sizing.
-func validateProxy(inst *corev1alpha1.Instance) error {
+func validateProxy(inst *corev1alpha1.Instance) field.ErrorList {
 	proxy, enabled := inst.Spec.Components[common.ComponentProxy]
 	if !enabled {
 		return nil
 	}
 
+	path := field.NewPath("spec", "components").Key(common.ComponentProxy)
 	topology := effectiveTopologyType(inst)
-	proxyType := proxyTypeOf(proxy, topology)
-	switch proxyType {
-	case common.ProxyTypeHAProxy, common.ProxyTypeRouter:
-	default:
-		return fmt.Errorf("%q type must be %q or %q", common.ComponentProxy, common.ProxyTypeHAProxy, common.ProxyTypeRouter)
+	supported := []string{common.ProxyTypeHAProxy}
+	if topology == common.TopologyGroupReplication {
+		supported = append(supported, common.ProxyTypeRouter)
 	}
-	if topology == common.TopologyAsync && proxyType != common.ProxyTypeHAProxy {
-		return fmt.Errorf("%q topology only supports proxy type %q", common.TopologyAsync, common.ProxyTypeHAProxy)
+
+	var errs field.ErrorList
+	if proxyType := proxyTypeOf(proxy, topology); !slices.Contains(supported, proxyType) {
+		errs = append(errs, field.NotSupported(path.Child("type"), proxyType, supported))
 	}
 	if proxy.Replicas != nil && *proxy.Replicas < 1 {
-		return fmt.Errorf("%q replicas must be >= 1", common.ComponentProxy)
+		errs = append(errs, field.Invalid(path.Child("replicas"), *proxy.Replicas, "must be at least 1"))
 	}
-	return nil
+	return errs
 }
 
 // proxyConfigurationFromComponent extracts the raw proxy configuration text

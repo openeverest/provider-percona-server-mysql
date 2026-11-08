@@ -15,14 +15,19 @@
 package provider
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
+	"slices"
+	"strconv"
+	"strings"
 
 	cmmeta "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
 	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
+	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
 	"github.com/openeverest/openeverest/v2/provider-runtime/controller"
 
 	"github.com/openeverest/provider-percona-server-mysql/definition"
@@ -41,11 +46,19 @@ const (
 // it.
 var certificateSecretKeys = []string{"tls.crt", "tls.key", caKey}
 
+// issuerKinds are the cert-manager issuer kinds an instance can name.
+var issuerKinds = []definition.IssuerKind{definition.IssuerKindIssuer, definition.IssuerKindClusterIssuer}
+
 // tlsParameters returns the instance's TLS parameters.
 func tlsParameters(c *controller.Context) (definition.TLSParameters, error) {
+	return instanceTLSParameters(c.Instance())
+}
+
+// instanceTLSParameters returns the TLS parameters of in.
+func instanceTLSParameters(in *corev1alpha1.Instance) (definition.TLSParameters, error) {
 	params := definition.Parameters{}
-	if raw := c.Instance().Spec.Parameters; raw != nil && len(raw.Raw) > 0 {
-		if err := c.DecodeParameters(&params); err != nil {
+	if raw := in.Spec.Parameters; raw != nil && len(raw.Raw) > 0 {
+		if err := json.Unmarshal(raw.Raw, &params); err != nil {
 			return definition.TLSParameters{}, fmt.Errorf("decode parameters: %w", err)
 		}
 	}
@@ -67,11 +80,20 @@ func tlsParameters(c *controller.Context) (definition.TLSParameters, error) {
 // certificateSecretName is the secret holding the certificate the instance
 // presents to clients and other members; the operator generates it under
 // its default name unless the instance brings its own.
-func certificateSecretName(c *controller.Context, tls definition.TLSParameters) string {
+func certificateSecretName(instanceName string, tls definition.TLSParameters) string {
 	if tls.CertificateSecretName != "" {
 		return tls.CertificateSecretName
 	}
-	return c.Name() + "-ssl"
+	return instanceName + "-ssl"
+}
+
+// issuerSource is the kind and name of the issuer that signs the
+// certificate, or "/" when there is none.
+func issuerSource(tls definition.TLSParameters) string {
+	if tls.Issuer == nil {
+		return "/"
+	}
+	return string(tls.Issuer.Kind) + "/" + tls.Issuer.Name
 }
 
 // configureTLS points the PS cluster at the certificate secret and, when set,
@@ -81,86 +103,129 @@ func certificateSecretName(c *controller.Context, tls definition.TLSParameters) 
 // exists and was not created by the operator, in which case it leaves it
 // alone.
 func configureTLS(c *controller.Context, cluster *psv1.PerconaServerMySQL, tls definition.TLSParameters) {
-	cluster.Spec.SSLSecretName = certificateSecretName(c, tls)
+	cluster.Spec.SSLSecretName = certificateSecretName(c.Name(), tls)
 	if issuer := issuerRef(tls); issuer != nil {
 		cluster.Spec.TLS = &psv1.TLSSpec{IssuerConf: issuer}
 	}
 }
 
-// validateTLS validates the TLS parameters, and that the certificate source
-// isn't changed on a running instance.
-func validateTLS(c *controller.Context) error {
-	tls, err := tlsParameters(c)
+// validateTLS checks the TLS parameters.
+func validateTLS(in *corev1alpha1.Instance) field.ErrorList {
+	tls, err := instanceTLSParameters(in)
 	if err != nil {
-		return err
+		return field.ErrorList{field.InternalError(field.NewPath("spec", "parameters"), err)}
 	}
+	path := field.NewPath("spec", "parameters", "tls")
 
-	if tls.Issuer != nil {
-		switch tls.Issuer.Kind {
-		case definition.IssuerKindIssuer, definition.IssuerKindClusterIssuer:
-		default:
-			return fmt.Errorf("tls.issuer.kind must be %s or %s, got %q",
-				definition.IssuerKindIssuer, definition.IssuerKindClusterIssuer, tls.Issuer.Kind)
-		}
+	var errs field.ErrorList
+	if tls.Issuer != nil && !slices.Contains(issuerKinds, tls.Issuer.Kind) {
+		errs = append(errs, field.NotSupported(path.Child("issuer", "kind"), tls.Issuer.Kind, issuerKinds))
 	}
-
 	if tls.CertificateSecretName != "" && tls.Issuer != nil {
-		return errors.New("tls: use either a certificate secret or an issuer, not both")
+		errs = append(errs, field.Forbidden(path.Child("issuer"), "use either a certificate secret or an issuer, not both"))
 	}
 
-	if tls.CertificateSecretName != "" {
-		if err := validateCertificateSecret(c, tls.CertificateSecretName); err != nil {
-			return err
-		}
-	}
-
-	return validateTLSChange(c, tls)
+	return errs
 }
 
-func validateCertificateSecret(c *controller.Context, name string) error {
-	secret := &corev1.Secret{}
-	if err := c.Get(secret, name); err != nil {
-		return fmt.Errorf("get certificate secret %q: %w", name, err)
-	}
-	for _, key := range certificateSecretKeys {
-		if len(secret.Data[key]) == 0 {
-			return fmt.Errorf("certificate secret %q is missing %q", name, key)
-		}
-	}
-	return nil
-}
-
-// validateTLSChange rejects a certificate source change on a running
+// validateTLSTransition rejects a certificate source change on a provisioned
 // instance: a new CA would be trusted by neither the existing members nor
 // the clients still holding the old one.
-func validateTLSChange(c *controller.Context, tls definition.TLSParameters) error {
+func validateTLSTransition(in, old *corev1alpha1.Instance) field.ErrorList {
+	if old == nil || old.Status.Phase == "" || old.Status.Phase == corev1alpha1.InstancePhasePending {
+		return nil
+	}
+	before, err := instanceTLSParameters(old)
+	if err != nil {
+		return nil
+	}
+	after, err := instanceTLSParameters(in)
+	if err != nil {
+		return nil
+	}
+
+	path := field.NewPath("spec", "parameters", "tls")
+	var errs field.ErrorList
+	if certificateSecretName(old.Name, before) != certificateSecretName(in.Name, after) {
+		errs = append(errs, field.Forbidden(path.Child("certificateSecretName"), "can't change on an existing instance"))
+	}
+	if issuerSource(before) != issuerSource(after) {
+		errs = append(errs, field.Forbidden(path.Child("issuer"), "can't change on an existing instance"))
+	}
+	return errs
+}
+
+// validateTLSReferences checks the certificate Secret, and that the
+// certificate source of the running PerconaServerMySQL doesn't change.
+func validateTLSReferences(c *controller.Context) (field.ErrorList, error) {
+	tls, err := tlsParameters(c)
+	if err != nil {
+		return nil, err
+	}
+
+	var errs field.ErrorList
+	if tls.CertificateSecretName != "" {
+		secretErrs, err := validateCertificateSecret(c, tls.CertificateSecretName)
+		if err != nil {
+			return nil, err
+		}
+		errs = append(errs, secretErrs...)
+	}
+
+	changeErrs, err := validateTLSChange(c, tls)
+	if err != nil {
+		return nil, err
+	}
+	return append(errs, changeErrs...), nil
+}
+
+func validateCertificateSecret(c *controller.Context, name string) (field.ErrorList, error) {
+	path := field.NewPath("spec", "parameters", "tls", "certificateSecretName")
+
+	secret := &corev1.Secret{}
+	if err := c.Get(secret, name); err != nil {
+		if apierrors.IsNotFound(err) {
+			return field.ErrorList{field.NotFound(path, name)}, nil
+		}
+		return nil, fmt.Errorf("get certificate secret %q: %w", name, err)
+	}
+	var missing []string
+	for _, key := range certificateSecretKeys {
+		if len(secret.Data[key]) == 0 {
+			missing = append(missing, strconv.Quote(key))
+		}
+	}
+	if len(missing) > 0 {
+		return field.ErrorList{field.Invalid(path, name, "missing "+strings.Join(missing, ", "))}, nil
+	}
+	return nil, nil
+}
+
+// validateTLSChange rejects a certificate source that differs from the one
+// the running PerconaServerMySQL uses.
+func validateTLSChange(c *controller.Context, tls definition.TLSParameters) (field.ErrorList, error) {
 	current := &psv1.PerconaServerMySQL{}
 	if err := c.Get(current, c.Name()); err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil
+			return nil, nil
 		}
-		return fmt.Errorf("fetching current PerconaServerMySQL: %w", err)
+		return nil, fmt.Errorf("fetching current PerconaServerMySQL: %w", err)
 	}
 
-	currentSecret := current.Spec.SSLSecretName
 	currentIssuer := "/"
 	if current.Spec.TLS != nil && current.Spec.TLS.IssuerConf != nil {
 		currentIssuer = current.Spec.TLS.IssuerConf.Kind + "/" + current.Spec.TLS.IssuerConf.Name
 	}
 
-	wantIssuer := "/"
-	if tls.Issuer != nil {
-		wantIssuer = string(tls.Issuer.Kind) + "/" + tls.Issuer.Name
+	path := field.NewPath("spec", "parameters", "tls")
+	var errs field.ErrorList
+	if current.Spec.SSLSecretName != "" && current.Spec.SSLSecretName != certificateSecretName(c.Name(), tls) {
+		errs = append(errs, field.Forbidden(path.Child("certificateSecretName"), "can't change on an existing instance"))
 	}
-
-	if currentSecret != "" && currentSecret != certificateSecretName(c, tls) {
-		return errors.New("tls.certificateSecretName can't change on an existing instance")
+	if currentIssuer != issuerSource(tls) {
+		errs = append(errs, field.Forbidden(path.Child("issuer"), "can't change on an existing instance"))
 	}
-	if currentIssuer != wantIssuer {
-		return errors.New("tls.issuer can't change on an existing instance")
-	}
-
-	return nil
+	return errs, nil
 }
 
 // tlsConnectionCA returns the CA clients verify the instance's certificate

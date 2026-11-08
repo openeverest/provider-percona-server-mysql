@@ -3,6 +3,7 @@ kind: Instance
 metadata:
   name: test-ps-tls-badsecret
 status:
-  phase: Failed
-
-
+  (conditions[?type == 'Ready']):
+    - status: "False"
+      reason: InvalidReference
+      (contains(message, 'spec.parameters.tls.certificateSecretName')): true

@@ -17,6 +17,7 @@ test/
   integration/
     .chainsaw.yaml             # Shared chainsaw configuration (timeouts, reports)
     core/cluster/              # Create, scale, affinity, Service type, delete
+    core/admission/            # Admission webhook: denials, ratcheting, warnings
     core/tls/                  # Certificate secret wiring, CA on the connection secret, validation
     backup/datasource/         # Backup and in-place restore (operator status simulated)
     monitoring/pmm/            # PMM MonitoringConfig mapped onto spec.pmm
@@ -38,6 +39,7 @@ suite lets the operator create that secret.
 make test-integration-env-up
 make test-integration
 make test-integration-core
+make test-integration-core-admission
 make test-integration-backup
 make test-integration-monitoring-pmm
 make test-integration-env-down

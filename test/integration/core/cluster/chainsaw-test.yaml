@@ -29,6 +29,8 @@ spec:
               # Operator-created webhook has no endpoints once scaled to 0.
               kubectl get validatingwebhookconfiguration -o name 2>/dev/null | while read -r name; do
                 case "$name" in
+                  # The provider's own Instance webhook.
+                  *.openeverest.io) ;;
                   *percona-server-mysql*|*ps-operator*) kubectl delete "$name" --ignore-not-found ;;
                 esac
               done

@@ -9,9 +9,12 @@ import (
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
 	"github.com/openeverest/openeverest/v2/provider-runtime/controller"
 	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -127,12 +130,10 @@ func TestTLSParameters(t *testing.T) {
 func TestCertificateSecretName(t *testing.T) {
 	t.Parallel()
 
-	c := testContext(t, nil)
-
-	if got, want := certificateSecretName(c, definition.TLSParameters{}), testInstanceName+"-ssl"; got != want {
+	if got, want := certificateSecretName(testInstanceName, definition.TLSParameters{}), testInstanceName+"-ssl"; got != want {
 		t.Fatalf("default secret name = %q, want %q", got, want)
 	}
-	if got, want := certificateSecretName(c, definition.TLSParameters{CertificateSecretName: "custom"}), "custom"; got != want {
+	if got, want := certificateSecretName(testInstanceName, definition.TLSParameters{CertificateSecretName: "custom"}), "custom"; got != want {
 		t.Fatalf("custom secret name = %q, want %q", got, want)
 	}
 }
@@ -180,114 +181,176 @@ func TestConfigureTLS(t *testing.T) {
 	})
 }
 
+// errorFields returns the field path of each error.
+func errorFields(errs field.ErrorList) []string {
+	var fields []string
+	for _, err := range errs {
+		fields = append(fields, err.Field)
+	}
+	return fields
+}
+
+// testInstance is the Instance testContext would build, in the given phase.
+func testInstance(t *testing.T, params *definition.Parameters, phase corev1alpha1.InstancePhase) *corev1alpha1.Instance {
+	t.Helper()
+	in := testContext(t, params).Instance()
+	in.Status.Phase = phase
+	return in
+}
+
 func TestValidateTLS(t *testing.T) {
 	t.Parallel()
 
-	t.Run("no parameters is ok", func(t *testing.T) {
-		t.Parallel()
-		c := testContext(t, nil)
-		if err := validateTLS(c); err != nil {
-			t.Fatal(err)
-		}
-	})
-
-	t.Run("invalid issuer kind rejected", func(t *testing.T) {
-		t.Parallel()
-		c := testContext(t, &definition.Parameters{
-			TLS: &definition.TLSParameters{Issuer: &definition.IssuerReference{Name: "i", Kind: "Bogus"}},
-		})
-		if err := validateTLS(c); err == nil {
-			t.Fatal("want error")
-		}
-	})
-
-	t.Run("secret and issuer together rejected", func(t *testing.T) {
-		t.Parallel()
-		c := testContext(t, &definition.Parameters{
-			TLS: &definition.TLSParameters{
-				CertificateSecretName: "my-certs",
-				Issuer:                &definition.IssuerReference{Name: "i"},
+	for _, tc := range []struct {
+		name   string
+		params *definition.Parameters
+		fields []string
+	}{
+		{name: "no parameters is ok"},
+		{
+			name: "certificate secret is ok",
+			params: &definition.Parameters{
+				TLS: &definition.TLSParameters{CertificateSecretName: "my-certs"},
 			},
-		}, certSecret(t, "my-certs", true))
-		if err := validateTLS(c); err == nil {
-			t.Fatal("want error")
-		}
-	})
-
-	t.Run("certificate secret missing is rejected", func(t *testing.T) {
-		t.Parallel()
-		c := testContext(t, &definition.Parameters{
-			TLS: &definition.TLSParameters{CertificateSecretName: "does-not-exist"},
+		},
+		{
+			name: "invalid issuer kind rejected",
+			params: &definition.Parameters{
+				TLS: &definition.TLSParameters{Issuer: &definition.IssuerReference{Name: "i", Kind: "Bogus"}},
+			},
+			fields: []string{"spec.parameters.tls.issuer.kind"},
+		},
+		{
+			name: "secret and issuer together rejected",
+			params: &definition.Parameters{
+				TLS: &definition.TLSParameters{
+					CertificateSecretName: "my-certs",
+					Issuer:                &definition.IssuerReference{Name: "i"},
+				},
+			},
+			fields: []string{"spec.parameters.tls.issuer"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.fields, errorFields(validateTLS(testInstance(t, tc.params, ""))))
 		})
-		if err := validateTLS(c); err == nil {
-			t.Fatal("want error")
-		}
-	})
+	}
+}
 
-	t.Run("certificate secret missing keys is rejected", func(t *testing.T) {
-		t.Parallel()
-		c := testContext(t, &definition.Parameters{
-			TLS: &definition.TLSParameters{CertificateSecretName: "incomplete"},
-		}, certSecret(t, "incomplete", false))
-		if err := validateTLS(c); err == nil {
-			t.Fatal("want error")
-		}
-	})
+func TestValidateTLSTransition(t *testing.T) {
+	t.Parallel()
 
-	t.Run("valid certificate secret is ok", func(t *testing.T) {
-		t.Parallel()
-		c := testContext(t, &definition.Parameters{
-			TLS: &definition.TLSParameters{CertificateSecretName: "my-certs"},
-		}, certSecret(t, "my-certs", true))
-		if err := validateTLS(c); err != nil {
-			t.Fatal(err)
-		}
-	})
+	secret := func(name string) *definition.Parameters {
+		return &definition.Parameters{TLS: &definition.TLSParameters{CertificateSecretName: name}}
+	}
+	issuer := func(name string) *definition.Parameters {
+		return &definition.Parameters{TLS: &definition.TLSParameters{Issuer: &definition.IssuerReference{Name: name}}}
+	}
 
-	t.Run("changing certificate secret on existing instance rejected", func(t *testing.T) {
-		t.Parallel()
-		existing := &psv1.PerconaServerMySQL{
+	for _, tc := range []struct {
+		name     string
+		old, new *definition.Parameters
+		oldPhase corev1alpha1.InstancePhase
+		noOld    bool
+		fields   []string
+	}{
+		{name: "no old instance", new: secret("new-certs"), noOld: true},
+		{name: "pending instance can change", old: secret("old-certs"), new: secret("new-certs"), oldPhase: corev1alpha1.InstancePhasePending},
+		{
+			name:     "changing certificate secret rejected",
+			old:      secret("old-certs"),
+			new:      secret("new-certs"),
+			oldPhase: corev1alpha1.InstancePhaseReady,
+			fields:   []string{"spec.parameters.tls.certificateSecretName"},
+		},
+		{
+			name:     "changing issuer rejected",
+			old:      issuer("old-issuer"),
+			new:      issuer("new-issuer"),
+			oldPhase: corev1alpha1.InstancePhaseReady,
+			fields:   []string{"spec.parameters.tls.issuer"},
+		},
+		{
+			name:     "naming the default secret is no change",
+			new:      secret(testInstanceName + "-ssl"),
+			oldPhase: corev1alpha1.InstancePhaseReady,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var old *corev1alpha1.Instance
+			if !tc.noOld {
+				old = testInstance(t, tc.old, tc.oldPhase)
+			}
+			assert.Equal(t, tc.fields, errorFields(validateTLSTransition(testInstance(t, tc.new, ""), old)))
+		})
+	}
+}
+
+func TestValidateTLSReferences(t *testing.T) {
+	t.Parallel()
+
+	existing := func(spec psv1.PerconaServerMySQLSpec) *psv1.PerconaServerMySQL {
+		return &psv1.PerconaServerMySQL{
 			ObjectMeta: metav1.ObjectMeta{Name: testInstanceName, Namespace: testNamespace},
-			Spec:       psv1.PerconaServerMySQLSpec{SSLSecretName: "old-certs"},
+			Spec:       spec,
 		}
-		c := testContext(t, &definition.Parameters{
-			TLS: &definition.TLSParameters{CertificateSecretName: "new-certs"},
-		}, existing, certSecret(t, "new-certs", true))
-		if err := validateTLS(c); err == nil {
-			t.Fatal("want error")
-		}
-	})
+	}
 
-	t.Run("changing issuer on existing instance rejected", func(t *testing.T) {
-		t.Parallel()
-		existing := &psv1.PerconaServerMySQL{
-			ObjectMeta: metav1.ObjectMeta{Name: testInstanceName, Namespace: testNamespace},
-			Spec: psv1.PerconaServerMySQLSpec{
+	for _, tc := range []struct {
+		name   string
+		params *definition.Parameters
+		objs   []runtime.Object
+		fields []string
+	}{
+		{name: "no parameters is ok"},
+		{
+			name:   "certificate secret missing is rejected",
+			params: &definition.Parameters{TLS: &definition.TLSParameters{CertificateSecretName: "does-not-exist"}},
+			fields: []string{"spec.parameters.tls.certificateSecretName"},
+		},
+		{
+			name:   "certificate secret missing keys is rejected",
+			params: &definition.Parameters{TLS: &definition.TLSParameters{CertificateSecretName: "incomplete"}},
+			objs:   []runtime.Object{certSecret(t, "incomplete", false)},
+			fields: []string{"spec.parameters.tls.certificateSecretName"},
+		},
+		{
+			name:   "valid certificate secret is ok",
+			params: &definition.Parameters{TLS: &definition.TLSParameters{CertificateSecretName: "my-certs"}},
+			objs:   []runtime.Object{certSecret(t, "my-certs", true)},
+		},
+		{
+			name:   "changing certificate secret on existing instance rejected",
+			params: &definition.Parameters{TLS: &definition.TLSParameters{CertificateSecretName: "new-certs"}},
+			objs: []runtime.Object{
+				existing(psv1.PerconaServerMySQLSpec{SSLSecretName: "old-certs"}),
+				certSecret(t, "new-certs", true),
+			},
+			fields: []string{"spec.parameters.tls.certificateSecretName"},
+		},
+		{
+			name:   "changing issuer on existing instance rejected",
+			params: &definition.Parameters{TLS: &definition.TLSParameters{Issuer: &definition.IssuerReference{Name: "new-issuer"}}},
+			objs: []runtime.Object{existing(psv1.PerconaServerMySQLSpec{
 				SSLSecretName: testInstanceName + "-ssl",
 				TLS:           &psv1.TLSSpec{IssuerConf: &cmmeta.IssuerReference{Name: "old-issuer", Kind: "Issuer"}},
-			},
-		}
-		c := testContext(t, &definition.Parameters{
-			TLS: &definition.TLSParameters{Issuer: &definition.IssuerReference{Name: "new-issuer"}},
-		}, existing)
-		if err := validateTLS(c); err == nil {
-			t.Fatal("want error")
-		}
-	})
-
-	t.Run("unchanged configuration on existing instance is ok", func(t *testing.T) {
-		t.Parallel()
-		existing := &psv1.PerconaServerMySQL{
-			ObjectMeta: metav1.ObjectMeta{Name: testInstanceName, Namespace: testNamespace},
-			Spec: psv1.PerconaServerMySQLSpec{
-				SSLSecretName: testInstanceName + "-ssl",
-			},
-		}
-		c := testContext(t, nil, existing)
-		if err := validateTLS(c); err != nil {
-			t.Fatal(err)
-		}
-	})
+			})},
+			fields: []string{"spec.parameters.tls.issuer"},
+		},
+		{
+			name: "unchanged configuration on existing instance is ok",
+			objs: []runtime.Object{existing(psv1.PerconaServerMySQLSpec{SSLSecretName: testInstanceName + "-ssl"})},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			errs, err := validateTLSReferences(testContext(t, tc.params, tc.objs...))
+			require.NoError(t, err)
+			assert.Equal(t, tc.fields, errorFields(errs))
+		})
+	}
 }
 
 func TestTLSConnectionCA(t *testing.T) {

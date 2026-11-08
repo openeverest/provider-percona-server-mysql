@@ -1,7 +1,4 @@
 apiVersion: core.openeverest.io/v1alpha1
 kind: Instance
 metadata:
-  name: test-ps-tls-bothset
-status:
-  phase: Failed
-
+  name: test-ps-admission

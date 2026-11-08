@@ -5,6 +5,7 @@ import (
 
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
 	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/openeverest/provider-percona-server-mysql/internal/common"
 )
@@ -19,7 +20,7 @@ const defaultOrchestratorSize int32 = 3
 // Sizes below the operator's safe range (odd, >= 3) are not rejected here:
 // applyOrchestrator sets unsafeFlags.orchestratorSize so the operator accepts
 // them, mirroring how mysqlSizeRequiresUnsafe handles MySQL sizing.
-func validateOrchestrator(inst *corev1alpha1.Instance) error {
+func validateOrchestrator(inst *corev1alpha1.Instance) field.ErrorList {
 	if effectiveTopologyType(inst) == common.TopologyGroupReplication {
 		return nil
 	}
@@ -29,11 +30,11 @@ func validateOrchestrator(inst *corev1alpha1.Instance) error {
 		return nil
 	}
 
-	if orch.Type != "" && orch.Type != common.ComponentTypeOrchestrator {
-		return fmt.Errorf("%q component type must be %q", common.ComponentOrchestrator, common.ComponentTypeOrchestrator)
-	}
 	if orch.Replicas != nil && *orch.Replicas < 1 {
-		return fmt.Errorf("%q replicas must be >= 1", common.ComponentOrchestrator)
+		return field.ErrorList{field.Invalid(
+			field.NewPath("spec", "components").Key(common.ComponentOrchestrator).Child("replicas"),
+			*orch.Replicas, "must be at least 1",
+		)}
 	}
 	return nil
 }
