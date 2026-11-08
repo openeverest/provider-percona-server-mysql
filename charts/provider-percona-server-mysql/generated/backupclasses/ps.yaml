@@ -10,18 +10,38 @@ spec:
   executionMode: ProviderManaged
   parametersSchema:
     openAPIV3Schema:
+      description: |-
+        PsBackupParameters describes the parameters accepted by Backup CRs that
+        target this class (spec.parameters). Add fields the user can set per backup.
       properties:
         type:
+          default: full
+          description: |-
+            Type selects the xtrabackup backup type. "full" (default) creates a
+            self-contained backup. "incremental" backs up only the data changed
+            since the base (full) backup — the operator picks the latest
+            Succeeded full backup on the same storage as the base when
+            incrementalBaseBackupName is not set.
+          enum:
+            - full
+            - incremental
           type: string
       type: object
   providerManaged:
     limits: {}
     pitrParametersSchema:
       openAPIV3Schema:
+        description: |-
+          PsPITRParameters describes the per-storage PITR parameters exposed to
+          Instance.spec.backup.storages[].pitr.parameters. Add fields a provider needs
+          to fine-tune its PITR pipeline (oplog span, compression, retention, etc.).
         type: object
     supportsPITR: false
   restoreParametersSchema:
     openAPIV3Schema:
+      description: |-
+        PsRestoreParameters describes the parameters accepted by Restore CRs that
+        target this class (spec.parameters). Add fields the user can set per restore.
       type: object
   supportedProviders:
     - percona-server-mysql

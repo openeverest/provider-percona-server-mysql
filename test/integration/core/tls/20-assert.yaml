@@ -3,7 +3,10 @@ kind: Instance
 metadata:
   name: test-ps-tls
 status:
-  phase: Failed
+  (conditions[?type == 'Ready']):
+    - status: "False"
+      reason: InvalidReference
+      (contains(message, 'spec.parameters.tls.certificateSecretName')): true
 ---
 # The operator CR must keep the original certificate secret: the provider
 # must not apply the rejected change.

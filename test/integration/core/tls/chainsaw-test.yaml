@@ -67,8 +67,6 @@ spec:
             content: |
               kubectl patch instance/test-ps-tls -n "$NAMESPACE" --type=merge \
                 -p '{"spec":{"parameters":{"tls":{"certificateSecretName":"test-ps-tls-certs-2"}}}}'
-              kubectl wait instance/test-ps-tls -n "$NAMESPACE" \
-                --for=jsonpath='{.status.phase}'=Failed --timeout=30s
         - assert:
             file: 20-assert.yaml
 
@@ -79,7 +77,7 @@ spec:
               kubectl patch instance/test-ps-tls -n "$NAMESPACE" --type=merge \
                 -p '{"spec":{"parameters":{"tls":{"certificateSecretName":"test-ps-tls-certs"}}}}'
               kubectl wait instance/test-ps-tls -n "$NAMESPACE" \
-                --for=jsonpath='{.status.phase}'=Ready --timeout=30s
+                --for=condition=Ready --timeout=30s
         - assert:
             file: 21-assert.yaml
 
@@ -87,17 +85,15 @@ spec:
       try:
         - apply:
             file: 30-create-cluster-incomplete-secret.yaml
+        - assert:
+            file: 30-assert.yaml
         - script:
             content: |
-              kubectl wait instance/test-ps-tls-badsecret -n "$NAMESPACE" \
-                --for=jsonpath='{.status.phase}'=Failed --timeout=30s
               # Validation must fail before Sync ever creates the operator CR.
               if kubectl get ps.ps.percona.com/test-ps-tls-badsecret -n "$NAMESPACE" 2>/dev/null; then
                 echo "unexpected: PerconaServerMySQL test-ps-tls-badsecret was created despite an incomplete certificate secret" >&2
                 exit 1
               fi
-        - assert:
-            file: 30-assert.yaml
         - script:
             content: |
               kubectl -n "$NAMESPACE" delete instance/test-ps-tls-badsecret --ignore-not-found --wait=true
@@ -106,16 +102,14 @@ spec:
       try:
         - apply:
             file: 31-create-cluster-secret-and-issuer.yaml
+        - assert:
+            file: 31-assert.yaml
         - script:
             content: |
-              kubectl wait instance/test-ps-tls-bothset -n "$NAMESPACE" \
-                --for=jsonpath='{.status.phase}'=Failed --timeout=30s
               if kubectl get ps.ps.percona.com/test-ps-tls-bothset -n "$NAMESPACE" 2>/dev/null; then
                 echo "unexpected: PerconaServerMySQL test-ps-tls-bothset was created despite both certificateSecretName and issuer being set" >&2
                 exit 1
               fi
-        - assert:
-            file: 31-assert.yaml
         - script:
             content: |
               kubectl -n "$NAMESPACE" delete instance/test-ps-tls-bothset --ignore-not-found --wait=true

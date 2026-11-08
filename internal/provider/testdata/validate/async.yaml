@@ -1,0 +1,19 @@
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: orders
+spec:
+  providerRef:
+    name: percona-server-mysql
+  topology:
+    type: async
+  components:
+    engine:
+      replicas: 3
+      storage:
+        size: 10Gi
+    orchestrator:
+      replicas: 3
+    proxy:
+      type: haproxy
+      replicas: 2

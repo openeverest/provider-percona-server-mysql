@@ -228,11 +228,15 @@ func applyBackupSettings(c *controller.Context, cluster *psv1.PerconaServerMySQL
 			if err != nil {
 				return &controller.BackupConfigError{Reason: "InvalidBackupParameters", Message: fmt.Sprintf("storage %q schedule %q: %v", storage.StorageRef.Name, schedule.Name, err)}
 			}
+			keep, err := scheduleKeep(schedule)
+			if err != nil {
+				return &controller.BackupConfigError{Reason: "RetentionTypeUnsupported", Message: err.Error()}
+			}
 			backupSpec.Schedule = append(backupSpec.Schedule, psv1.BackupSchedule{
 				Name:        schedule.Name,
 				Schedule:    schedule.Cron,
 				StorageName: storage.StorageRef.Name,
-				Keep:        int(schedule.RetentionCopies),
+				Keep:        keep,
 				Type:        backupType,
 			})
 		}
@@ -240,6 +244,19 @@ func applyBackupSettings(c *controller.Context, cluster *psv1.PerconaServerMySQL
 
 	cluster.Spec.Backup = backupSpec
 	return nil
+}
+
+// scheduleKeep returns the number of backups the operator keeps for the
+// schedule, 0 (keep all) when it sets no retention. The PS operator only
+// supports count-based retention.
+func scheduleKeep(schedule corev1alpha1.InstanceBackupSchedule) (int, error) {
+	if schedule.Retention == nil {
+		return 0, nil
+	}
+	if schedule.Retention.Type != corev1alpha1.BackupScheduleRetentionTypeCount {
+		return 0, fmt.Errorf("schedule %q: %s retention is not supported by Percona Server for MySQL, use count", schedule.Name, schedule.Retention.Type)
+	}
+	return int(*schedule.Retention.Count), nil
 }
 
 // resolveBackupImage resolves the xtrabackup image to use for backups and

@@ -26,6 +26,7 @@ import (
 // Compile-time check that Provider implements the required interface.
 var _ controller.ProviderInterface = (*Provider)(nil)
 var _ controller.FieldIndexProvider = (*Provider)(nil)
+var _ controller.ReferenceValidator = (*Provider)(nil)
 
 // Provider implements controller.ProviderInterface for the
 // provider-percona-server-mysql provider.
@@ -64,27 +65,6 @@ func New() *Provider {
 		},
 	}
 	return p
-}
-
-// Validate checks if the Instance spec is valid.
-//
-// Add your provider-specific validation logic here.
-// Return an error if the spec is invalid.
-func (p *Provider) Validate(c *controller.Context) error {
-	l := log.FromContext(c.Context())
-	l.Info("Validating instance", "name", c.Name())
-
-	if err := validateOrchestrator(c.Instance()); err != nil {
-		return err
-	}
-	if err := validateProxy(c.Instance()); err != nil {
-		return err
-	}
-	if err := validateTLS(c); err != nil {
-		return fmt.Errorf("tls validation failed: %w", err)
-	}
-
-	return nil
 }
 
 // Sync ensures all required resources exist and are configured correctly.
