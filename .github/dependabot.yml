@@ -1,0 +1,29 @@
+# The Percona Operator for MySQL is pinned twice: as a Go module (its API types,
+# in go.mod) and as the bundled Helm subchart (charts/provider-percona-server-mysql/Chart.yaml).
+# Both are placed in one multi-ecosystem group so a new operator release arrives
+# as a single PR that bumps them together.
+version: 2
+
+multi-ecosystem-groups:
+  ps-operator:
+    schedule:
+      interval: "daily"
+    labels:
+      - "dependencies"
+
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    allow:
+      - dependency-name: "github.com/percona/percona-server-mysql-operator"
+    patterns:
+      - "github.com/percona/percona-server-mysql-operator"
+    multi-ecosystem-group: "ps-operator"
+
+  - package-ecosystem: "helm"
+    directory: "/charts/provider-percona-server-mysql"
+    allow:
+      - dependency-name: "ps-operator"
+    patterns:
+      - "ps-operator"
+    multi-ecosystem-group: "ps-operator"
