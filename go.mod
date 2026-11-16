@@ -96,7 +96,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oasdiff/yaml v0.1.1 // indirect
 	github.com/oasdiff/yaml3 v0.0.14 // indirect
-	github.com/openeverest/provider-sdk v0.3.1-0.20261105152211-04995b27cda5 // indirect
+	github.com/openeverest/provider-sdk v0.3.1-0.20261111192002-42351e7f8f71 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.24.0 // indirect

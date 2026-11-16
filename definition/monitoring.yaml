@@ -13,10 +13,8 @@ integrations:
     authModes: [ServiceAccountToken]
 componentTypes:
   mysql:
-    kind: mysql
     metrics: Exporter
   haproxy:
-    kind: haproxy
     metrics: Native
 
 
