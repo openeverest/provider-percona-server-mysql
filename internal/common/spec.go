@@ -22,8 +22,7 @@ const (
 	// backups and restores.
 	ComponentBackup = "backup"
 
-	ComponentMonitoring = "monitoring"
-	MonitoringTypePMM   = "pmm"
+	ComponentTypeMySQLDExporter = "mysqld-exporter"
 
 	TopologyAsync            = "async"
 	TopologyGroupReplication = "groupreplication"

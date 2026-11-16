@@ -23,7 +23,14 @@ components:
     # resolveBackupImage and definition/versions.yaml's componentTypes.backup.
     backup:
         type: backup
-    monitoring:
-        type: pmm
-        parametersSchema: PMMParameters
 name: percona-server-mysql
+
+# Component types: the kind of the software each type runs, published as
+# Provider.spec.componentTypes.<type>.kind and matched by monitoring classes.
+# Router is not listed: it has no Prometheus endpoint to expose.
+componentTypes:
+    mysql:
+        kind: mysql
+    haproxy:
+        kind: haproxy
+

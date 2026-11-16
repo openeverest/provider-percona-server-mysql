@@ -28,8 +28,6 @@ config:
                     resources: {}
                     service: {}
                     schedulingPolicy: {}
-        monitoring:
-            optional: true
 ui:
     sections:
         databaseVersion:
@@ -128,18 +126,6 @@ ui:
             - diskSize
             - resourcesLimits
             - resourcesRequests
-        monitoring:
-          label: "Monitoring"
-          description: "Attach a MonitoringConfig to collect metrics."
-          components:
-            monitoring:
-              uiType: select
-              path: spec.components.monitoring.parameters.monitoringConfigName
-              fieldParams:
-                label: "Monitoring endpoint"
-                displayEmpty: true
-              dataSource:
-                provider: monitoringConfigs
         proxy:
           label: "Proxy"
           description: "Configure a single proxy type for the cluster."
@@ -315,7 +301,6 @@ ui:
     sectionsOrder:
         - databaseVersion
         - resources
-        - monitoring
         - proxy
         - tls
         - advanced
