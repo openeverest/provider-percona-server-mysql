@@ -14,7 +14,7 @@ metadata:
 spec:
   (monitoring == null): true
 status:
-  (monitoring == null): true
+  (monitoring.destinations == null): true
   (length(conditions[?type == 'MonitoringConfigured'])): 0
 ---
 # The token mirror is dropped from the users Secret; the Secret itself stays,
