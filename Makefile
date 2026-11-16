@@ -199,7 +199,7 @@ test-integration-env-down: ## Tear down the local integration test environment.
 	$(MAKE) k3d-cluster-down
 
 .PHONY: openeverest-checkout
-openeverest-checkout: ## Check out openeverest/openeverest at OPENEVEREST_REF for integration env bootstrap.
+openeverest-checkout: ## Check out openeverest/openeverest at OPENEVEREST_REF into OPENEVEREST_DIR.
 	@ref="$(OPENEVEREST_REF)"; \
 	test -n "$$ref" || { echo "cannot resolve the openeverest/openeverest commit pinned in go.mod" >&2; exit 1; }; \
 	if [ ! -d "$(OPENEVEREST_DIR)/.git" ]; then \
