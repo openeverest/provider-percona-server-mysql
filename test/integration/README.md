@@ -20,16 +20,17 @@ test/
     core/admission/            # Admission webhook: denials, ratcheting, warnings
     core/tls/                  # Certificate secret wiring, CA on the connection secret, validation
     backup/datasource/         # Backup and in-place restore (operator status simulated)
-    monitoring/pmm/            # PMM MonitoringConfig mapped onto spec.pmm
+    monitoring/pmm/            # PMM MonitoringDestination/Binding mapped onto spec.pmm
   e2e-cluster/
     core/tls/                  # Real operator: self-signed cert, verify the live TLS connection
     datasource/backup/         # Real operator backup/restore against SeaweedFS
     monitoring/pmm/            # Real operator: spec.pmm and pmmservertoken
 ```
 
-PMM monitoring is covered by `monitoring/pmm`. The provider maps the optional
-`monitoring` component onto `PerconaServerMySQL.spec.pmm` and copies the
-MonitoringConfig API key into the users secret as `pmmservertoken`. Integration
+PMM monitoring is covered by `monitoring/pmm`. The provider renders a pmm
+Instance monitoring destination entry (`spec.monitoring.destinations[]`) onto
+`PerconaServerMySQL.spec.pmm` through a `MonitoringBinding`, and copies the
+destination's token into the users secret as `pmmservertoken`. Integration
 tests pre-create `<name>-secrets` because the operator is scaled to 0. The e2e
 suite lets the operator create that secret.
 

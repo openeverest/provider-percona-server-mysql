@@ -1,26 +1,28 @@
-apiVersion: v1
-kind: Secret
-metadata:
-  name: test-pmm-secret
-type: Opaque
-data:
-  apiKey: YXNkZmcxMjM=
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: test-ps-cluster-secrets
-type: Opaque
-data:
-  pmmservertoken: YXNkZmcxMjM=
----
+# With the entry gone, PMM is disabled and the Instance reports no
+# monitoring.
 apiVersion: ps.percona.com/v1
 kind: PerconaServerMySQL
 metadata:
   name: test-ps-cluster
 spec:
-  pmm:
-    enabled: true
-    serverHost: pmm-updated.example.invalid
-    image: percona/pmm-client:3.8.1
+  (pmm == null): true
+---
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: test-ps-cluster
+spec:
+  (monitoring == null): true
+status:
+  (monitoring == null): true
+  (length(conditions[?type == 'MonitoringConfigured'])): 0
+---
+# The token mirror is dropped from the users Secret; the Secret itself stays,
+# since the operator also keeps other users in it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-ps-cluster-secrets
+data:
+  (pmmservertoken == null): true
 
