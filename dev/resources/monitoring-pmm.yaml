@@ -1,0 +1,72 @@
+# Manual PMM monitoring wiring for a dev cluster: there is no out-of-tree
+# monitoring-pmm class controller deployed yet, so this MonitoringClass's
+# Accepted condition is patched by hand (see dev/README.md) instead of being
+# claimed by a real controller.
+apiVersion: monitoring.openeverest.io/v1alpha1
+kind: MonitoringClass
+metadata:
+  name: pmm
+spec:
+  controllerName: openeverest.io/monitoring-pmm
+  displayName: Percona Monitoring and Management
+  description: Operator-native PMM client integration.
+  providerManaged:
+    integration: pmm
+    agentImage: percona/pmm-client:3.10.0
+    agentVersion: 3.10.0
+  authModes:
+    - name: ServiceAccountToken
+      credentials:
+        required: [token]
+  # Schemas copied from monitoring-pmm/api's generated
+  # zz_generated.{destination,instance}-parameters.yaml, which is what a real
+  # monitoring-pmm MonitoringClass controller would publish.
+  destinationParametersSchema:
+    openAPIV3Schema:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: "PMM Server URL, for example https://pmm.example.com, without user information."
+          pattern: '^https?://[^/?#@]+/?$'
+  instanceParametersSchema:
+    openAPIV3Schema:
+      type: object
+      properties:
+        resources:
+          type: object
+          additionalProperties: false
+          description: Resource requirements of the pmm-client container.
+          properties:
+            limits:
+              type: object
+              additionalProperties:
+                anyOf:
+                  - type: integer
+                  - type: string
+                x-kubernetes-int-or-string: true
+            requests:
+              type: object
+              additionalProperties:
+                anyOf:
+                  - type: integer
+                  - type: string
+                x-kubernetes-int-or-string: true
+---
+apiVersion: monitoring.openeverest.io/v1alpha1
+kind: MonitoringDestination
+metadata:
+  name: pmm-dev
+  namespace: default
+spec:
+  classRef:
+    name: pmm
+  parameters:
+    url: "https://monitoring-service.pmm.svc.cluster.local:443"
+  authentication:
+    mode: ServiceAccountToken
+    credentialsSecretRef:
+      name: pmm-sa-token
+
+
