@@ -5,6 +5,16 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    # Nightly against openeverest/openeverest main, to catch breaking core
+    # changes before go.mod is bumped.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      openeverest_ref:
+        description: 'openeverest/openeverest ref (branch, tag or SHA) to test against; empty uses the version pinned in go.mod'
+        type: string
+        default: main
 
 # Cancel in-progress runs for the same branch/PR when a new commit arrives.
 # On main we let runs queue so every commit is validated.
@@ -95,6 +105,7 @@ jobs:
     needs: [lint, build, verify, helm-lint]
     uses: ./.github/workflows/integration-test.yaml
     with:
+      openeverest_ref: ${{ github.event_name == 'schedule' && 'main' || inputs.openeverest_ref || '' }}
       make_target: test-integration
       suite: integration
       timeout_minutes: 60
