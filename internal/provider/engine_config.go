@@ -56,6 +56,18 @@ func applyEngineConfiguration(cluster *psv1.PerconaServerMySQL, engine corev1alp
 	return nil
 }
 
+func applyEngineExpose(cluster *psv1.PerconaServerMySQL, engine corev1alpha1.ComponentSpec) {
+	if engine.Service == nil {
+		cluster.Spec.MySQL.ExposePrimary = psv1.ServiceExposeTogglable{}
+		cluster.Spec.MySQL.Expose = psv1.ServiceExposeTogglable{}
+		return
+	}
+
+	expose := serviceExposeFromComponent(engine.Service)
+	cluster.Spec.MySQL.ExposePrimary = psv1.ServiceExposeTogglable{Enabled: true, ServiceExpose: expose}
+	cluster.Spec.MySQL.Expose = psv1.ServiceExposeTogglable{Enabled: true, ServiceExpose: expose}
+}
+
 // renderMySQLConfiguration converts a parameter map into the key=value snippet
 // the Percona Server for MySQL operator writes to my.cnf. encoding/json sorts
 // object keys, so the snippet is stable across reconciles.

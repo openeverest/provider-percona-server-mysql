@@ -192,8 +192,25 @@ spec:
                 regex:
                   message: 'Each line must be a "parameter: value" pair (or a # comment), e.g. max_connections: "500"'
                   pattern: ^([ \t]*(#.*)?|[ \t]*[A-Za-z_][\w.]*[ \t]*:.*)(\r?\n([ \t]*(#.*)?|[ \t]*[A-Za-z_][\w.]*[ \t]*:.*))*[ \t\r\n]*$
+            engineExposure:
+              fieldParams:
+                defaultValue: ClusterIP
+                helperText: How clients reach MySQL directly, bypassing the proxy. ClusterIP keeps it reachable only from inside the Kubernetes cluster. Most clients should go through the proxy instead; this is for clients that need a direct connection.
+                label: Direct database exposure
+                options:
+                  - label: ClusterIP
+                    value: ClusterIP
+                  - label: LoadBalancer
+                    value: LoadBalancer
+                  - label: NodePort
+                    value: NodePort
+              path: spec.components.engine.service.serviceType
+              uiType: select
+              validation:
+                required: true
           componentsOrder:
             - configuration
+            - engineExposure
           description: Fine-tune MySQL by overriding its default configuration parameters.
           label: Advanced Configuration
         databaseVersion:
@@ -244,6 +261,22 @@ spec:
                   timeout client 30s
               path: spec.components.proxy.parameters.configuration
               uiType: text
+            proxyExposure:
+              fieldParams:
+                defaultValue: ClusterIP
+                helperText: How clients reach the proxy. ClusterIP keeps it reachable only from inside the Kubernetes cluster.
+                label: Exposure
+                options:
+                  - label: ClusterIP
+                    value: ClusterIP
+                  - label: LoadBalancer
+                    value: LoadBalancer
+                  - label: NodePort
+                    value: NodePort
+              path: spec.components.proxy.service.serviceType
+              uiType: select
+              validation:
+                required: true
             proxyLimits:
               components:
                 cpu:
@@ -318,6 +351,7 @@ spec:
             - proxyNodes
             - proxyLimits
             - proxyRequests
+            - proxyExposure
             - proxyConfiguration
           description: Configure a single proxy type for the cluster.
           label: Proxy
@@ -481,8 +515,25 @@ spec:
                 regex:
                   message: 'Each line must be a "parameter: value" pair (or a # comment), e.g. max_connections: "500"'
                   pattern: ^([ \t]*(#.*)?|[ \t]*[A-Za-z_][\w.]*[ \t]*:.*)(\r?\n([ \t]*(#.*)?|[ \t]*[A-Za-z_][\w.]*[ \t]*:.*))*[ \t\r\n]*$
+            engineExposure:
+              fieldParams:
+                defaultValue: ClusterIP
+                helperText: How clients reach MySQL directly, bypassing the proxy. ClusterIP keeps it reachable only from inside the Kubernetes cluster. Most clients should go through the proxy instead; this is for clients that need a direct connection.
+                label: Direct database exposure
+                options:
+                  - label: ClusterIP
+                    value: ClusterIP
+                  - label: LoadBalancer
+                    value: LoadBalancer
+                  - label: NodePort
+                    value: NodePort
+              path: spec.components.engine.service.serviceType
+              uiType: select
+              validation:
+                required: true
           componentsOrder:
             - configuration
+            - engineExposure
           description: Fine-tune MySQL by overriding its default configuration parameters.
           label: Advanced Configuration
         databaseVersion:
@@ -519,6 +570,22 @@ spec:
                   # section, depending on the selected proxy type.
               path: spec.components.proxy.parameters.configuration
               uiType: text
+            proxyExposure:
+              fieldParams:
+                defaultValue: ClusterIP
+                helperText: How clients reach the proxy. ClusterIP keeps it reachable only from inside the Kubernetes cluster.
+                label: Exposure
+                options:
+                  - label: ClusterIP
+                    value: ClusterIP
+                  - label: LoadBalancer
+                    value: LoadBalancer
+                  - label: NodePort
+                    value: NodePort
+              path: spec.components.proxy.service.serviceType
+              uiType: select
+              validation:
+                required: true
             proxyLimits:
               components:
                 cpu:
@@ -595,6 +662,7 @@ spec:
             - proxyNodes
             - proxyLimits
             - proxyRequests
+            - proxyExposure
             - proxyConfiguration
           description: Configure a single proxy type for the cluster.
           label: Proxy
