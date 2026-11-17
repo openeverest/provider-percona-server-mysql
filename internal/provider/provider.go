@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"fmt"
 
 	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
@@ -10,33 +9,24 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	backupv1alpha1 "github.com/openeverest/openeverest/v2/api/backup/v1alpha1"
-	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
 	monitoringv1alpha1 "github.com/openeverest/openeverest/v2/api/monitoring/v1alpha1"
 	"github.com/openeverest/openeverest/v2/provider-runtime/controller"
 	"github.com/openeverest/provider-percona-server-mysql/internal/common"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // Compile-time check that Provider implements the required interface.
 var _ controller.ProviderInterface = (*Provider)(nil)
-var _ controller.FieldIndexProvider = (*Provider)(nil)
 var _ controller.ReferenceValidator = (*Provider)(nil)
 
 // Provider implements controller.ProviderInterface for the
 // provider-percona-server-mysql provider.
 type Provider struct {
 	controller.BaseProvider
-	client client.Client
-}
-
-func (p *Provider) SetClient(c client.Client) {
-	p.client = c
 }
 
 // New creates a new Provider instance.
@@ -47,17 +37,14 @@ func New() *Provider {
 
 		SchemeFuncs: []func(*runtime.Scheme) error{
 			psv1.AddToScheme,
+			// Sync lists MonitoringBindings and the conformance harness's
+			// scheme has only these.
 			monitoringv1alpha1.AddToScheme,
 		},
 
 		WatchConfigs: []controller.WatchConfig{
 			controller.WatchOwned(
 				&psv1.PerconaServerMySQL{},
-			),
-			controller.WatchExternal(
-				&monitoringv1alpha1.MonitoringConfig{},
-				handler.EnqueueRequestsFromMapFunc(p.enqueueMonitoringConfig),
-				controller.ResourceVersionChangedPredicate,
 			),
 			controller.WatchExternal(&backupv1alpha1.Restore{},
 				handler.EnqueueRequestsFromMapFunc(enqueueRestoreInstance()),
@@ -216,7 +203,7 @@ func (p *Provider) Sync(c *controller.Context) error {
 		return fmt.Errorf("apply proxy: %w", err)
 	}
 
-	if err := applyMonitoringSettings(c, cluster, providerSpec); err != nil {
+	if err := applyMonitoring(c, cluster, providerSpec); err != nil {
 		return fmt.Errorf("apply monitoring: %w", err)
 	}
 
@@ -356,60 +343,4 @@ func (p *Provider) Cleanup(c *controller.Context) error {
 	}
 
 	return controller.WaitFor("waiting for PerconaServerMySQL to be deleted")
-}
-
-func (p *Provider) enqueueMonitoringConfig(ctx context.Context, obj client.Object) []reconcile.Request {
-	if p.client == nil {
-		return nil
-	}
-
-	mc, ok := obj.(*monitoringv1alpha1.MonitoringConfig)
-	if !ok {
-		return nil
-	}
-
-	instances := &corev1alpha1.InstanceList{}
-	if err := p.client.List(ctx, instances,
-		client.InNamespace(mc.Namespace),
-		client.MatchingFields{monitoringConfigRefFieldPath: mc.Name},
-	); err != nil {
-		return nil
-	}
-
-	requests := make([]reconcile.Request, 0, len(instances.Items))
-	for i := range instances.Items {
-		instance := instances.Items[i]
-		if instance.Spec.ProviderRef.Name != p.Name() {
-			continue
-		}
-		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&instance)})
-	}
-	return requests
-}
-
-func (p *Provider) FieldIndexes() []controller.FieldIndex {
-	return []controller.FieldIndex{
-		{
-			Object:    &corev1alpha1.Instance{},
-			FieldPath: monitoringConfigRefFieldPath,
-			Extractor: func(obj client.Object) []string {
-				instance, ok := obj.(*corev1alpha1.Instance)
-				if !ok {
-					return nil
-				}
-
-				monitoringComponent, ok := instance.Spec.Components[common.ComponentMonitoring]
-				if !ok {
-					return nil
-				}
-
-				monitoringConfigName, err := monitoringConfigNameFromComponent(monitoringComponent)
-				if err != nil || monitoringConfigName == "" {
-					return nil
-				}
-
-				return []string{monitoringConfigName}
-			},
-		},
-	}
 }

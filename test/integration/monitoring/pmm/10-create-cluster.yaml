@@ -32,8 +32,13 @@ spec:
     proxy:
       type: haproxy
       replicas: 1
-    monitoring:
-      type: pmm
-      parameters:
-        monitoringConfigName: test-pmm
+  monitoring:
+    destinations:
+      - name: pmm
+        destinationRef:
+          name: pmm-it
+        parameters:
+          resources:
+            limits:
+              memory: 400Mi
 

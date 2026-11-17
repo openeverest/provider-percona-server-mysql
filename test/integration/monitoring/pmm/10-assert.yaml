@@ -12,11 +12,49 @@ spec:
     proxy:
       type: haproxy
       replicas: 1
-    monitoring:
-      type: pmm
-      parameters:
-        monitoringConfigName: test-pmm
+  monitoring:
+    destinations:
+      - name: pmm
+        destinationRef:
+          name: pmm-it
+        parameters:
+          resources:
+            limits:
+              memory: 400Mi
 ---
+# Core materialises one binding for the entry; it resolves to ProviderManaged
+# and the provider reports it Configured, flagged because pmm-client does not
+# verify the PMM server certificate.
+apiVersion: monitoring.openeverest.io/v1alpha1
+kind: MonitoringBinding
+metadata:
+  labels:
+    core.openeverest.io/instance: test-ps-cluster
+    monitoring.openeverest.io/entry: pmm
+  ownerReferences:
+    - apiVersion: core.openeverest.io/v1alpha1
+      kind: Instance
+      name: test-ps-cluster
+spec:
+  instanceRef:
+    name: test-ps-cluster
+  destinationRef:
+    name: pmm-it
+  classRef:
+    name: pmm-it
+  executionMode: ProviderManaged
+  parameters:
+    resources:
+      limits:
+        memory: 400Mi
+status:
+  (conditions[?type == 'Accepted'].status | [0]): "True"
+  (conditions[?type == 'Configured'].status | [0]): "True"
+  (conditions[?type == 'Configured'].reason | [0]): AgentTLSNotVerified
+---
+# spec.pmm comes from the binding: server from the destination URL, image
+# from the class, limits from the entry parameters, requests sized from the
+# engine's memory.
 apiVersion: ps.percona.com/v1
 kind: PerconaServerMySQL
 metadata:
@@ -31,10 +69,18 @@ spec:
   pmm:
     enabled: true
     serverHost: pmm.example.invalid
-    image: percona/pmm-client:3.8.1
+    image: percona/pmm-client:3.8.0
     customClusterName: test-ps-cluster
     imagePullPolicy: IfNotPresent
+    mysqlParams: (join('', ['--custom-labels=namespace=', $namespace, ',core_openeverest_io_instance=test-ps-cluster,core_openeverest_io_component=engine']))
+    resources:
+      requests:
+        cpu: 95m
+        memory: 99604Ki
+      limits:
+        memory: 400Mi
 ---
+# The destination token, mirrored to the users secret the operator reads.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -43,12 +89,20 @@ type: Opaque
 data:
   pmmservertoken: YWJjZGVm
 ---
-apiVersion: monitoring.openeverest.io/v1alpha1
-kind: MonitoringConfig
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
 metadata:
-  name: test-pmm
-spec:
-  type: pmm
-  pmm:
-    url: http://pmm.example.invalid
+  name: test-ps-cluster
+status:
+  monitoring:
+    (destinations[?name == 'pmm'] | [0]):
+      mode: ProviderManaged
+      (conditions[?type == 'Configured'] | [0]):
+        status: "True"
+        reason: AgentTLSNotVerified
+      # No extension probes pmm-it here, so its Ready stays Pending.
+      (conditions[?type == 'Ready'] | [0]):
+        status: Unknown
+        reason: Pending
+  (conditions[?type == 'MonitoringConfigured'].status | [0]): "True"
 

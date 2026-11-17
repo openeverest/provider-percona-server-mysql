@@ -5,15 +5,21 @@ metadata:
   name: monitoring-pmm
 spec:
   description: |
-    PMM monitoring lifecycle for the Percona Server for MySQL provider: attach a
-    MonitoringConfig, map it onto PerconaServerMySQL.spec.pmm (host, PMM 3
-    image, cluster name), copy the API key into the users secret as
-    pmmservertoken, propagate URL and credential updates, then disable and
-    re-enable monitoring.
-    The Percona operator is scaled to 0 so status is simulated.
+    PMM through Instance.spec.monitoring.destinations[]: core materialises a
+    ProviderManaged binding for the pmm entry and refuses deleting the
+    destination while the Instance lists it; the provider renders
+    PerconaServerMySQL.spec.pmm from the binding and mirrors the destination
+    token into the users Secret. A pmm destination that rejects its token
+    leaves the pmm entry Configured but not Ready. The provider keeps the
+    rendering if the destination disappears anyway, and disables PMM and
+    drops the token mirror once the entry is dropped. The monitoring-pmm
+    controller is not installed, so the class is claimed by hand; the
+    Percona operator is scaled to 0.
   catch:
     - script:
-        content: kubectl -n $NAMESPACE get instance,ps.ps.percona.com,monitoringconfig,secret -o yaml
+        content: kubectl -n $NAMESPACE get instance,ps.ps.percona.com,monitoringdestination,monitoringbinding,secret -o yaml
+    - script:
+        content: kubectl get monitoringclass -o yaml
     - podLogs:
         namespace: provider-system
         selector: app.kubernetes.io/name=provider-percona-server-mysql
@@ -26,7 +32,7 @@ spec:
             done
           done
   steps:
-    - name: setup-monitoring
+    - name: setup
       try:
         - script:
             content: |
@@ -42,105 +48,90 @@ spec:
               done
         - apply:
             file: 00-install.yaml
+        # Stand in for the monitoring-pmm controller: a class is usable only
+        # once its controller has claimed it at its current generation.
+        - script:
+            content: |
+              gen=$(kubectl get monitoringclass/pmm-it -o jsonpath='{.metadata.generation}')
+              kubectl patch monitoringclass/pmm-it --subresource status --type merge \
+                -p '{"status":{"conditions":[{"type":"Accepted","status":"True","reason":"Accepted","message":"claimed by the test","observedGeneration":'"$gen"',"lastTransitionTime":"2026-01-01T00:00:00Z"}]}}'
         - assert:
             file: 00-assert.yaml
 
-    - name: create-cluster
+    - name: create-cluster-with-pmm
       try:
         - apply:
             file: 10-create-cluster.yaml
-        - script:
-            content: |
-              # The users secret is created in the same step. If Sync ran before
-              # it existed, nudge the Instance so the token is copied.
-              for i in $(seq 1 30); do
-                token=$(kubectl get secret/test-ps-cluster-secrets -n "$NAMESPACE" -o jsonpath='{.data.pmmservertoken}' 2>/dev/null || true)
-                host=$(kubectl get ps.ps.percona.com/test-ps-cluster -n "$NAMESPACE" -o jsonpath='{.spec.pmm.serverHost}' 2>/dev/null || true)
-                if [ "$token" = "YWJjZGVm" ] && [ "$host" = "pmm.example.invalid" ]; then
-                  exit 0
-                fi
-                kubectl annotate instance/test-ps-cluster -n "$NAMESPACE" test.openeverest.io/reconcile="$(date +%s)" --overwrite || true
-                sleep 1
-              done
-              echo "PMM spec or pmmservertoken was not applied" >&2
-              exit 1
         - assert:
             file: 10-assert.yaml
 
-    - name: cluster-ready
+    # Stand in for the pmm extension's probe: the server rejects the token.
+    - name: pmm-destination-rejects-the-token
       try:
-        - apply:
-            file: 11-cluster-ready.yaml
         - script:
             content: |
-              kubectl patch ps.ps.percona.com/test-ps-cluster --subresource status -n "$NAMESPACE" --type=merge \
-                -p "{\"status\":{\"state\":\"ready\",\"host\":\"test-ps-cluster-haproxy.${NAMESPACE}.svc.cluster.local\",\"mysql\":{\"size\":3,\"ready\":3,\"state\":\"ready\"},\"haproxy\":{\"size\":1,\"ready\":1,\"state\":\"ready\"}}}"
+              set -e
+              gen=$(kubectl get monitoringdestination/pmm-it -n $NAMESPACE -o jsonpath='{.metadata.generation}')
+              patch=$(kubectl get monitoringdestination/pmm-it -n $NAMESPACE -o json | jq -c --argjson gen "$gen" \
+                '{status: {conditions: ([.status.conditions[]? | select(.type != "Ready")] + [{type: "Ready", status: "False", reason: "Unauthorized", message: "probed by the test", observedGeneration: $gen, lastTransitionTime: "2026-01-01T00:00:00Z"}])}}')
+              kubectl patch monitoringdestination/pmm-it -n $NAMESPACE --subresource status --type merge -p "$patch"
         - assert:
-            file: 11-assert.yaml
+            file: 11-pmm-unauthorized-assert.yaml
 
-    - name: custom-monitoring-resources
+    # The token is replaced and the probe succeeds.
+    - name: pmm-destination-accepts-the-token
       try:
-        - apply:
-            file: 14-cluster-custom-monitoring-resource.yaml
         - script:
             content: |
-              kubectl wait ps.ps.percona.com/test-ps-cluster -n "$NAMESPACE" \
-                --for=jsonpath='{.spec.pmm.resources.limits.cpu}'=500m --timeout=30s
-              kubectl patch ps.ps.percona.com/test-ps-cluster --subresource status -n "$NAMESPACE" --type=merge \
-                -p "{\"status\":{\"state\":\"ready\",\"host\":\"test-ps-cluster-haproxy.${NAMESPACE}.svc.cluster.local\",\"mysql\":{\"size\":3,\"ready\":3,\"state\":\"ready\"},\"haproxy\":{\"size\":1,\"ready\":1,\"state\":\"ready\"}}}"
+              set -e
+              gen=$(kubectl get monitoringdestination/pmm-it -n $NAMESPACE -o jsonpath='{.metadata.generation}')
+              patch=$(kubectl get monitoringdestination/pmm-it -n $NAMESPACE -o json | jq -c --argjson gen "$gen" \
+                '{status: {conditions: ([.status.conditions[]? | select(.type != "Ready")] + [{type: "Ready", status: "True", reason: "Ready", message: "probed by the test", observedGeneration: $gen, lastTransitionTime: "2026-01-01T00:00:00Z"}])}}')
+              kubectl patch monitoringdestination/pmm-it -n $NAMESPACE --subresource status --type merge -p "$patch"
         - assert:
-            file: 14-assert.yaml
+            file: 11-pmm-ready-assert.yaml
 
-    - name: update-monitoring-config
+    # Core refuses deleting a destination an Instance lists. Force it through
+    # (a deletion admitted on a stale count, then the in-use finalizer
+    # removed) to cover a destination that disappears anyway.
+    - name: delete-destination
       try:
-        - apply:
-            file: 20-update-config.yaml
+        - assert:
+            resource:
+              apiVersion: monitoring.openeverest.io/v1alpha1
+              kind: MonitoringDestination
+              metadata:
+                name: pmm-it
+              status:
+                attachedInstances: 1
+        - script:
+            content: kubectl -n $NAMESPACE delete monitoringdestination/pmm-it --wait=false
+            check:
+              ($error != null): true
+              (contains($stderr, 'in use by 1 database')): true
         - script:
             content: |
-              kubectl wait ps.ps.percona.com/test-ps-cluster -n "$NAMESPACE" \
-                --for=jsonpath='{.spec.pmm.serverHost}'=pmm-updated.example.invalid --timeout=30s
+              set -e
+              kubectl -n $NAMESPACE patch monitoringdestination/pmm-it --subresource=status --type=merge -p '{"status":{"attachedInstances":0}}'
+              kubectl -n $NAMESPACE delete monitoringdestination/pmm-it --wait=false
+              kubectl -n $NAMESPACE patch monitoringdestination/pmm-it --type=merge -p '{"metadata":{"finalizers":null}}'
+        - error:
+            resource:
+              apiVersion: monitoring.openeverest.io/v1alpha1
+              kind: MonitoringDestination
+              metadata:
+                name: pmm-it
         - assert:
             file: 20-assert.yaml
 
-    - name: update-monitoring-credentials
+    - name: drop-pmm-entry
       try:
         - apply:
-            file: 30-update-credentials.yaml
-        - script:
-            content: |
-              # Secrets are not watched; bump MonitoringConfig so Sync re-copies the token.
-              kubectl annotate monitoringconfig/test-pmm -n "$NAMESPACE" test.openeverest.io/reconcile="$(date +%s)" --overwrite
-              for i in $(seq 1 30); do
-                token=$(kubectl get secret/test-ps-cluster-secrets -n "$NAMESPACE" -o jsonpath='{.data.pmmservertoken}')
-                if [ "$token" = "YXNkZmcxMjM=" ]; then
-                  exit 0
-                fi
-                sleep 1
-              done
-              echo "pmmservertoken was not updated" >&2
-              exit 1
+            file: 30-drop-pmm.yaml
         - assert:
             file: 30-assert.yaml
-
-    - name: disable-monitoring
-      try:
-        - apply:
-            file: 40-disable-monitoring.yaml
-        - assert:
-            file: 40-assert.yaml
-
-    - name: enable-monitoring
-      try:
-        - apply:
-            file: 50-enable-monitoring.yaml
-        - script:
-            content: |
-              kubectl wait ps.ps.percona.com/test-ps-cluster -n "$NAMESPACE" \
-                --for=jsonpath='{.spec.pmm.enabled}'=true --timeout=30s
-              kubectl patch ps.ps.percona.com/test-ps-cluster --subresource status -n "$NAMESPACE" --type=merge \
-                -p "{\"status\":{\"state\":\"ready\",\"host\":\"test-ps-cluster-haproxy.${NAMESPACE}.svc.cluster.local\",\"mysql\":{\"size\":3,\"ready\":3,\"state\":\"ready\"},\"haproxy\":{\"size\":1,\"ready\":1,\"state\":\"ready\"}}}"
-        - assert:
-            file: 50-assert.yaml
+        - error:
+            file: 30-errors.yaml
 
     - name: delete-cluster
       try:
@@ -160,6 +151,5 @@ spec:
             name: test-ps-cluster
             for:
               deletion: {}
-        - assert:
-            file: 60-assert.yaml
+
 

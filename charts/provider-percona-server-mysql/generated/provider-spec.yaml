@@ -11,11 +11,13 @@ spec:
           version: 8.4.0-6.1
     haproxy:
       defaultVersion: 2.8.18-1
+      kind: haproxy
       versions:
         - image: percona/haproxy:2.8.18-1
           version: 2.8.18-1
     mysql:
       defaultVersion: 8.4.10-10.1
+      kind: mysql
       versions:
         - image: percona/percona-server:8.0.40-31
           version: 8.0.40-31
@@ -35,18 +37,16 @@ spec:
           version: 8.4.8-8.1
         - image: percona/percona-server:8.4.10-10.1
           version: 8.4.10-10.1
+    mysqld-exporter:
+      defaultVersion: 0.20.0
+      versions:
+        - image: prom/mysqld-exporter:v0.20.0
+          version: 0.20.0
     orchestrator:
       defaultVersion: 3.2.6-22
       versions:
         - image: percona/percona-orchestrator:3.2.6-22
           version: 3.2.6-22
-    pmm:
-      defaultVersion: 3.8.1
-      versions:
-        - image: percona/pmm-client:2.44.1-1
-          version: 2.44.1-1
-        - image: percona/pmm-client:3.8.1
-          version: 3.8.1
     router:
       defaultVersion: 8.4.10-10.1
       versions:
@@ -80,19 +80,6 @@ spec:
               type: string
           type: object
       type: mysql
-    monitoring:
-      parametersSchema:
-        openAPIV3Schema:
-          description: PMMParameters defines structured parameters for PMM monitoring.
-          properties:
-            monitoringConfigName:
-              description: |-
-                MonitoringConfigName specifies the name of the MonitoringConfig resource
-                to use for configuring PMM monitoring.
-                If not specified, monitoring will not be configured.
-              type: string
-          type: object
-      type: pmm
     orchestrator:
       type: orchestrator
     proxy:
@@ -111,6 +98,17 @@ spec:
           type: object
       type: haproxy
   defaultVersion: 8.4.10-10.1
+  monitoring:
+    componentTypes:
+      haproxy:
+        metrics: Native
+      mysql:
+        metrics: Exporter
+    integrations:
+      pmm:
+        agentVersions: '>=3.0.0 <4.0.0'
+        authModes:
+          - ServiceAccountToken
   parametersSchema:
     openAPIV3Schema:
       description: |-
@@ -151,8 +149,6 @@ spec:
     async:
       components:
         engine: {}
-        monitoring:
-          optional: true
         orchestrator:
           optional: true
         proxy:
@@ -160,8 +156,6 @@ spec:
     groupreplication:
       components:
         engine: {}
-        monitoring:
-          optional: true
         proxy:
           optional: true
           supportedFields:
@@ -223,18 +217,6 @@ spec:
                 required: true
           description: Provide the database version for your new database.
           label: Database Version
-        monitoring:
-          components:
-            monitoring:
-              dataSource:
-                provider: monitoringConfigs
-              fieldParams:
-                displayEmpty: true
-                label: Monitoring endpoint
-              path: spec.components.monitoring.parameters.monitoringConfigName
-              uiType: select
-          description: Attach a MonitoringConfig to collect metrics.
-          label: Monitoring
         orchestrator:
           components:
             orchestratorNodes:
@@ -475,7 +457,6 @@ spec:
       sectionsOrder:
         - databaseVersion
         - resources
-        - monitoring
         - orchestrator
         - proxy
         - tls
@@ -525,18 +506,6 @@ spec:
                 required: true
           description: Provide the database version for your new database.
           label: Database Version
-        monitoring:
-          components:
-            monitoring:
-              dataSource:
-                provider: monitoringConfigs
-              fieldParams:
-                displayEmpty: true
-                label: Monitoring endpoint
-              path: spec.components.monitoring.parameters.monitoringConfigName
-              uiType: select
-          description: Attach a MonitoringConfig to collect metrics.
-          label: Monitoring
         proxy:
           components:
             proxyConfiguration:
@@ -765,7 +734,6 @@ spec:
       sectionsOrder:
         - databaseVersion
         - resources
-        - monitoring
         - proxy
         - tls
         - advanced
@@ -773,45 +741,36 @@ spec:
     - components:
         backup: 8.0.35-36.1
         engine: 8.0.40-31
-        monitoring: 3.8.1
       name: 8.0.40-31
     - components:
         backup: 8.0.35-36.1
         engine: 8.0.42-33
-        monitoring: 3.8.1
       name: 8.0.42-33
     - components:
         backup: 8.0.35-36.1
         engine: 8.0.43-34.1
-        monitoring: 3.8.1
       name: 8.0.43-34.1
     - components:
         backup: 8.0.35-36.1
         engine: 8.0.45-36.1
-        monitoring: 3.8.1
       name: 8.0.45-36.1
     - components:
         backup: 8.0.35-36.1
         engine: 8.0.46-37.1
-        monitoring: 3.8.1
       name: 8.0.46-37.1
     - components:
         backup: 8.4.0-6.1
         engine: 8.4.5-5
-        monitoring: 3.8.1
       name: 8.4.5-5
     - components:
         backup: 8.4.0-6.1
         engine: 8.4.6-6.1
-        monitoring: 3.8.1
       name: 8.4.6-6.1
     - components:
         backup: 8.4.0-6.1
         engine: 8.4.8-8.1
-        monitoring: 3.8.1
       name: 8.4.8-8.1
     - components:
         backup: 8.4.0-6.1
         engine: 8.4.10-10.1
-        monitoring: 3.8.1
       name: 8.4.10-10.1

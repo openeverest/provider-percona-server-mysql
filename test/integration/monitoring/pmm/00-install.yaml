@@ -1,21 +1,73 @@
 ---
+# The monitoring-pmm chart's pmm class, rendered with its default values and
+# without its display fields and UI hints, under a test-local name.
+apiVersion: monitoring.openeverest.io/v1alpha1
+kind: MonitoringClass
+metadata:
+  name: pmm-it
+spec:
+  controllerName: test.openeverest.io/provider-percona-server-mysql-it
+  providerManaged:
+    integration: pmm
+    agentImage: "percona/pmm-client:3.8.0"
+    agentVersion: "3.8.0"
+  destinationParametersSchema:
+    openAPIV3Schema:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          pattern: '^https?://[^/?#@]+/?$'
+  authModes:
+    - name: ServiceAccountToken
+      credentials:
+        required: [token]
+  instanceParametersSchema:
+    openAPIV3Schema:
+      type: object
+      properties:
+        resources:
+          type: object
+          description: Resource requirements of the pmm-client container.
+          additionalProperties: false
+          properties:
+            limits:
+              type: object
+              additionalProperties:
+                anyOf:
+                  - type: integer
+                  - type: string
+                pattern: '^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$'
+                x-kubernetes-int-or-string: true
+            requests:
+              type: object
+              additionalProperties:
+                anyOf:
+                  - type: integer
+                  - type: string
+                pattern: '^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$'
+                x-kubernetes-int-or-string: true
+---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: test-pmm-secret
+  name: pmm-it-token
 type: Opaque
 data:
-  apiKey: YWJjZGVm
+  token: YWJjZGVm
 ---
 apiVersion: monitoring.openeverest.io/v1alpha1
-kind: MonitoringConfig
+kind: MonitoringDestination
 metadata:
-  name: test-pmm
+  name: pmm-it
 spec:
-  type: pmm
-  pmm:
-    credentialsSecretRef:
-      name: test-pmm-secret
-    verifyTLS: false
+  classRef:
+    name: pmm-it
+  parameters:
     url: http://pmm.example.invalid
+  authentication:
+    mode: ServiceAccountToken
+    credentialsSecretRef:
+      name: pmm-it-token
 

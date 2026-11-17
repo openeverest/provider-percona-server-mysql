@@ -1,13 +1,15 @@
+# The destination is gone: core revokes Accepted and the provider keeps the
+# live rendering until the entry is dropped.
 apiVersion: monitoring.openeverest.io/v1alpha1
-kind: MonitoringConfig
+kind: MonitoringBinding
 metadata:
-  name: test-pmm
-spec:
-  type: pmm
-  pmm:
-    credentialsSecretRef:
-      name: test-pmm-secret
-    url: http://pmm-updated.example.invalid
+  labels:
+    core.openeverest.io/instance: test-ps-cluster
+    monitoring.openeverest.io/entry: pmm
+status:
+  (conditions[?type == 'Accepted'].status | [0]): "False"
+  (conditions[?type == 'Accepted'].reason | [0]): DestinationNotFound
+  (conditions[?type == 'Configured'].reason | [0]): Retained
 ---
 apiVersion: ps.percona.com/v1
 kind: PerconaServerMySQL
@@ -16,15 +18,22 @@ metadata:
 spec:
   pmm:
     enabled: true
-    serverHost: pmm-updated.example.invalid
-    image: percona/pmm-client:3.8.1
-    customClusterName: test-ps-cluster
+    serverHost: pmm.example.invalid
+    image: percona/pmm-client:3.8.0
 ---
-apiVersion: v1
-kind: Secret
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
 metadata:
-  name: test-ps-cluster-secrets
-type: Opaque
-data:
-  pmmservertoken: YWJjZGVm
+  name: test-ps-cluster
+status:
+  monitoring:
+    (destinations[?name == 'pmm'] | [0]):
+      (conditions[?type == 'Configured'] | [0]):
+        status: "False"
+        reason: DestinationNotFound
+      (conditions[?type == 'Ready'] | [0]):
+        status: "False"
+        reason: NotAccepted
+  (conditions[?type == 'MonitoringConfigured'].status | [0]): "False"
+  (conditions[?type == 'MonitoringReady'].status | [0]): "False"
 

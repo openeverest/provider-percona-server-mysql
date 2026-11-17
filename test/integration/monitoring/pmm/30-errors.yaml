@@ -1,0 +1,7 @@
+# The binding goes with its entry.
+apiVersion: monitoring.openeverest.io/v1alpha1
+kind: MonitoringBinding
+metadata:
+  labels:
+    core.openeverest.io/instance: test-ps-cluster
+

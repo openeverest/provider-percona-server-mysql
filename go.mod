@@ -3,11 +3,14 @@ module github.com/openeverest/provider-percona-server-mysql
 go 1.27.1
 
 require (
-	github.com/openeverest/openeverest/v2 v2.0.0-dev.2.0.20261105181435-0223b79fa57d
+	github.com/cert-manager/cert-manager v1.20.3
+	github.com/openeverest/monitoring-pmm/api v0.0.0-20261110082751-22ff528eb0dc
+	github.com/openeverest/openeverest/v2 v2.0.0-dev.2.0.20261116095347-0e95d109e65d
 	github.com/percona/percona-server-mysql-operator v1.2.0
 	github.com/stretchr/testify v1.12.1
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
+	k8s.io/client-go v0.37.1
 	sigs.k8s.io/controller-runtime v0.25.1
 	sigs.k8s.io/yaml v1.6.0
 )
@@ -32,7 +35,6 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/cert-manager/cert-manager v1.20.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/bubbles v1.0.0 // indirect
 	github.com/charmbracelet/bubbletea v1.3.10 // indirect
@@ -94,7 +96,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oasdiff/yaml v0.1.1 // indirect
 	github.com/oasdiff/yaml3 v0.0.14 // indirect
-	github.com/openeverest/provider-sdk v0.3.1-0.20261105152211-04995b27cda5 // indirect
+	github.com/openeverest/provider-sdk v0.3.1-0.20261111192002-42351e7f8f71 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.24.0 // indirect
@@ -137,7 +139,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.37.1 // indirect
 	k8s.io/apiserver v0.37.1 // indirect
-	k8s.io/client-go v0.37.1 // indirect
 	k8s.io/component-base v0.37.1 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20260721132016-d427ff9ee9ad // indirect

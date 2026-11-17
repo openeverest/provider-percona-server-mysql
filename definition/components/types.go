@@ -26,14 +26,6 @@ type HaproxyCustomSpec struct{}
 // affinity, and service are standard ComponentSpec fields.
 type RouterCustomSpec struct{}
 
-// PMMParameters defines structured parameters for PMM monitoring.
-type PMMParameters struct {
-	// MonitoringConfigName specifies the name of the MonitoringConfig resource
-	// to use for configuring PMM monitoring.
-	// If not specified, monitoring will not be configured.
-	MonitoringConfigName *string `json:"monitoringConfigName,omitempty"`
-}
-
 // MysqlParameters defines custom parameters for mysql components.
 type MysqlParameters struct {
 	// Configuration allows specifying custom MySQL configuration
