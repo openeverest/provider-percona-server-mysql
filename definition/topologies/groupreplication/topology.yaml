@@ -186,7 +186,7 @@ ui:
                   uiType: text
                   path: spec.components.proxy.resources.requests.cpu
                   fieldParams:
-                    label: CPU Limit
+                    label: CPU Request
                   validation:
                     regex:
                       pattern: '^([0-9]+m|[0-9]+(\.[0-9]{1,3})?)$'
@@ -196,7 +196,7 @@ ui:
                   placeholder: 1Gi
                   path: spec.components.proxy.resources.requests.memory
                   fieldParams:
-                    label: Memory Limit
+                    label: Memory Request
                   validation:
                     regex:
                       pattern: '^[0-9]+(\.[0-9]+)?(Ki|Mi|Gi|Ti|Pi|Ei)$'
