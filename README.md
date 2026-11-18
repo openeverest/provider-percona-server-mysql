@@ -72,6 +72,7 @@ provider itself is covered under [Installation](#installation).
 | Vertical scaling (CPU / memory) | ✅ | Requests and limits on the engine and proxy |
 | Version upgrades | ❌ | Version is selected at create time |
 | Custom configuration | ✅ | `spec.components.engine.parameters.configuration` — see [Custom MySQL configuration](#custom-mysql-configuration) |
+| Exposure | ✅ | `spec.components.<name>.service.serviceType`: `ClusterIP` (default), `LoadBalancer` or `NodePort`, for `engine` and `proxy` independently — both are exposed in the UI. `proxy.service` controls how clients reach HAProxy/Router and is how most clients should connect; `engine.service` exposes the MySQL primary and per-pod Services directly, bypassing the proxy, for clients that need a direct connection. `service.annotations` and, for `LoadBalancer`, `service.loadBalancerService.sourceRanges` are also supported on both, but only via the `Instance` spec directly — the UI doesn't expose them yet ([openeverest#1959](https://github.com/openeverest/openeverest/issues/1959), [openeverest#2398](https://github.com/openeverest/openeverest/issues/2398)) |
 | Monitoring | ✅ | PMM, via the optional `monitoring` component |
 | TLS | ✅ | Always on (the operator's default); bring your own certificate secret or a cert-manager issuer — see [TLS](#tls) |
 

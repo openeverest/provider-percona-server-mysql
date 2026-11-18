@@ -178,6 +178,8 @@ func (p *Provider) Sync(c *controller.Context) error {
 		return fmt.Errorf("apply engine configuration: %w", err)
 	}
 
+	applyEngineExpose(cluster, engine)
+
 	topologyType := effectiveTopologyType(c.Instance())
 
 	switch topologyType {
