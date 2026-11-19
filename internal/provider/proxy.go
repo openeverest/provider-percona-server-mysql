@@ -101,7 +101,8 @@ func applyProxy(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance, spec *
 		return fmt.Errorf("cannot resolve image for %q type %q", common.ComponentProxy, proxyType)
 	}
 
-	pod := componentPodSpec(proxy, image, defaultProxySize)
+	size, _ := proxyReplicas(inst)
+	pod := componentPodSpec(proxy, image, size)
 	configuration, err := proxyConfigurationFromComponent(proxy)
 	if err != nil {
 		return err

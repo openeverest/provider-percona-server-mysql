@@ -19,6 +19,12 @@ package provider
 // PROVIDER-SPECIFIC RBAC
 // =============================================================================
 
+// Allow tracking rollouts: an Instance has converged only once the cluster's
+// StatefulSets and MySQL Router Deployment run what the PerconaServerMySQL
+// asks for, and an engine image rolling out is read from the MySQL
+// StatefulSet's revisions.
+// +kubebuilder:rbac:groups=apps,resources=statefulsets;deployments,verbs=list;watch
+// +kubebuilder:rbac:groups=apps,resources=controllerrevisions,verbs=get
 // +kubebuilder:rbac:groups=ps.percona.com,resources=perconaservermysqls,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=ps.percona.com,resources=perconaservermysqls/status,verbs=get
 // +kubebuilder:rbac:groups=ps.percona.com,resources=perconaservermysqls/finalizers,verbs=update

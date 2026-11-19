@@ -41,14 +41,36 @@ func New() *Provider {
 			// Sync lists MonitoringBindings and the conformance harness's
 			// scheme has only these.
 			monitoringv1alpha1.AddToScheme,
+			// StatefulSets and Deployments are read to tell whether the
+			// cluster has rolled out.
+			appsv1.AddToScheme,
 		},
 
 		WatchConfigs: []controller.WatchConfig{
 			controller.WatchOwned(
 				&psv1.PerconaServerMySQL{},
 			),
+			// Watch Restores so the Instance stops reporting a restore as
+			// soon as one reaches a terminal state.
 			controller.WatchExternal(&backupv1alpha1.Restore{},
 				handler.EnqueueRequestsFromMapFunc(enqueueRestoreInstance()),
+			),
+			// Watch the operator's restores, including those created on it
+			// directly: a failed one leaves the cluster paused without
+			// touching the PerconaServerMySQL object again.
+			controller.WatchExternal(&psv1.PerconaServerMySQLRestore{},
+				handler.EnqueueRequestsFromMapFunc(enqueueOperatorRestoreInstance()),
+			),
+			// Watch the cluster's StatefulSets and the MySQL Router
+			// Deployment: the Instance has converged only once they have
+			// rolled out, which the operator's own status can report too
+			// early. They are owned by the PerconaServerMySQL, so map them by
+			// their controller.
+			controller.WatchExternal(&appsv1.StatefulSet{},
+				handler.EnqueueRequestsFromMapFunc(enqueueClusterWorkloadInstance()),
+			),
+			controller.WatchExternal(&appsv1.Deployment{},
+				handler.EnqueueRequestsFromMapFunc(enqueueClusterWorkloadInstance()),
 			),
 		},
 	}
@@ -144,14 +166,15 @@ func (p *Provider) Sync(c *controller.Context) error {
 		)
 	}
 
-	if engine.Replicas == nil {
+	size, ok := engineReplicas(c.Instance())
+	if !ok {
 		return fmt.Errorf(
 			"instance spec missing %q component replicas",
 			common.ComponentEngine,
 		)
 	}
 
-	cluster.Spec.MySQL.Size = *engine.Replicas
+	cluster.Spec.MySQL.Size = size
 
 	if engine.Resources != nil {
 		cluster.Spec.MySQL.Resources = *engine.Resources
@@ -224,55 +247,9 @@ func (p *Provider) Sync(c *controller.Context) error {
 	return nil
 }
 
-// Status returns the current status of the PerconaServerMySQL resource.
-func (p *Provider) Status(
-	c *controller.Context,
-) (controller.Status, error) {
-	l := log.FromContext(c.Context())
-	l.Info("Computing status", "name", c.Name())
-
-	cluster := &psv1.PerconaServerMySQL{}
-
-	if err := c.Get(cluster, c.Name()); err != nil {
-		if errors.IsNotFound(err) {
-			return controller.Provisioning("waiting for PerconaServerMySQL resource"), nil
-		}
-
-		return controller.Status{}, fmt.Errorf("get PerconaServerMySQL %q: %w", c.Name(), err)
-	}
-
-	// A restore drives the engine through paused, starting and momentarily
-	// ready states, so reading the phase off the engine alone makes the
-	// Instance flap between Restoring, Provisioning and Ready while one is
-	// in flight. The Restore CR reaching a terminal state is what ends the
-	// restore, so let it own the phase for as long as it is running.
-	activeRestore, err := hasActiveRestoreForInstance(c, c.Namespace(), c.Name())
-	if err != nil {
-		return controller.Status{}, fmt.Errorf("check active restores for %q: %w", c.Name(), err)
-	}
-	if activeRestore {
-		return controller.Restoring("Restore is running"), nil
-	}
-
-	switch cluster.Status.State {
-	case psv1.StateReady:
-		details, err := connectionDetails(c, cluster)
-		if err != nil {
-			return controller.Status{}, fmt.Errorf(
-				"get connection details for PerconaServerMySQL %q: %w", c.Name(), err,
-			)
-		}
-
-		return controller.ReadyWithConnectionDetails(details), nil
-	case psv1.StateError:
-		return controller.Failed("PerconaServerMySQL cluster is in error state"), nil
-	case psv1.StatePaused, psv1.StateStopping:
-		return controller.Provisioning("PerconaServerMySQL cluster is paused"), nil
-	case psv1.StateInitializing:
-		return controller.Initializing("PerconaServerMySQL cluster is initializing"), nil
-	default:
-		return controller.Provisioning("waiting for PerconaServerMySQL to become ready"), nil
-	}
+// Status reports what the provider observes about the cluster.
+func (p *Provider) Status(c *controller.Context) (controller.Status, error) {
+	return clusterStatus(c)
 }
 
 func connectionDetails(

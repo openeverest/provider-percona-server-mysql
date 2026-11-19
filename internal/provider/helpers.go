@@ -95,11 +95,7 @@ func serviceExposeFromComponent(svc *corev1alpha1.Service) psv1.ServiceExpose {
 	return expose
 }
 
-func componentPodSpec(comp corev1alpha1.ComponentSpec, image string, defaultSize int32) psv1.PodSpec {
-	size := defaultSize
-	if comp.Replicas != nil {
-		size = *comp.Replicas
-	}
+func componentPodSpec(comp corev1alpha1.ComponentSpec, image string, size int32) psv1.PodSpec {
 	ps := psv1.PodSpec{
 		Size: size,
 		ContainerSpec: psv1.ContainerSpec{
@@ -111,6 +107,47 @@ func componentPodSpec(comp corev1alpha1.ComponentSpec, image string, defaultSize
 	}
 	applySchedulingPolicy(&ps, comp.SchedulingPolicy)
 	return ps
+}
+
+// engineReplicas returns the number of MySQL pods the Instance asks for, and
+// whether it says.
+func engineReplicas(inst *corev1alpha1.Instance) (int32, bool) {
+	engine, ok := inst.Spec.Components[common.ComponentEngine]
+	if !ok || engine.Replicas == nil {
+		return 0, false
+	}
+	return *engine.Replicas, true
+}
+
+// orchestratorReplicas returns the number of orchestrator pods the Instance
+// asks for, the provider's default when it does not say, and whether it has
+// the component. A group-replication cluster runs no orchestrator.
+func orchestratorReplicas(inst *corev1alpha1.Instance) (int32, bool) {
+	orch, ok := inst.Spec.Components[common.ComponentOrchestrator]
+	if !ok {
+		return 0, false
+	}
+	if effectiveTopologyType(inst) == common.TopologyGroupReplication {
+		return 0, true
+	}
+	return replicasOrDefault(orch, defaultOrchestratorSize), true
+}
+
+// proxyReplicas returns the number of proxy pods the Instance asks for, the
+// provider's default when it does not say, and whether it has the component.
+func proxyReplicas(inst *corev1alpha1.Instance) (int32, bool) {
+	proxy, ok := inst.Spec.Components[common.ComponentProxy]
+	if !ok {
+		return 0, false
+	}
+	return replicasOrDefault(proxy, defaultProxySize), true
+}
+
+func replicasOrDefault(comp corev1alpha1.ComponentSpec, def int32) int32 {
+	if comp.Replicas != nil {
+		return *comp.Replicas
+	}
+	return def
 }
 
 // applySchedulingPolicy copies OpenEverest placement settings onto a
