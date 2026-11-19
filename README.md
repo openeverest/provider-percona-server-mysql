@@ -165,6 +165,61 @@ kubectl get instance my-instance -o jsonpath='{.status.connection}'
 Credentials, when the technology has any, are in the secret named by
 `.status.connection.credentialsSecretRef`.
 
+### Status
+
+The provider reports what it observes, and OpenEverest derives the `Instance` conditions from
+it the same way for every provider.
+
+| Condition | What this provider reports |
+|---|---|
+| `Available` | `True` while the MySQL pods, and the HAProxy or MySQL Router pods in front of them, each have a pod the operator counts as ready in the `PerconaServerMySQL` status. Otherwise `False`, with reason `NoNodeReady` or `NoProxyReady`. It is `False` while a restore runs or the cluster is paused. |
+| `Ready` | `True` once the cluster runs what the `Instance` asks for: the operator reports it `ready` for the sizes the `PerconaServerMySQL` asks for, and the StatefulSets of the MySQL, orchestrator and HAProxy pods, and the MySQL Router Deployment, run the object's images and sizes and have rolled out. Until then the message says what is being waited for. |
+| `Restoring` | `True` while a `Restore` of the `Instance` runs, or a `PerconaServerMySQLRestore` created on the operator directly. |
+| `Upgrading` | `True` while the MySQL StatefulSet rolls out a pod template with a new image. |
+| `StorageResizing` | `True` while the operator grows the volumes of the MySQL pods. |
+
+The connection details Secret is written the first time the database is available, and kept
+current while a change rolls out.
+
+The provider reports, per component, the pods it will have once the cluster runs the `Instance`'s current spec, defaults included: `engine` counts the MySQL pods, `proxy` the HAProxy or MySQL Router pods (2 unless set), `orchestrator` the orchestrator pods of an `async` cluster (3 unless set; 0 for `groupreplication`, which runs none), and `backup`, which has no pods of its own, is not reported. OpenEverest shows them as `desiredReplicas` in `status.components` once the provider labels its pods, which it does not do yet (see below).
+
+A problem makes the `Instance` not `Ready`, with a reason that says what is wrong:
+
+| Reason | Cause |
+|---|---|
+| `PausedOutsideOpenEverest` | `spec.pause` is set on the `PerconaServerMySQL`, and no restore, for which the operator pauses the cluster itself, explains it. Nothing but unsetting it there starts the database again. |
+| `PausedAfterFailedRestore` | The operator paused the cluster for a `PerconaServerMySQLRestore` that failed, and does not start it again by itself. Restore again, or unset `spec.pause` on the `PerconaServerMySQL`. |
+| `FullClusterCrashDetected` | The operator found that every member of the group crashed. It recovers the group by itself. |
+| `AuthenticationFailed` | MySQL rejects the operator's credentials, for example because the users Secret does not match the data. |
+| `ConfigurationRejected` | The operator refuses the cluster's configuration. |
+| `TLSCertificatesNotReady` | The operator cannot get the cluster's certificates. |
+| `ResizeFailed`, `QuotaExceeded` | The volumes of the MySQL pods could not be grown. |
+| `EngineError` | Any other error the operator reports; the message quotes it. |
+
+A write that conflicted with another one is not a problem, because the operator retries it on its next pass; while it lasts, the `Instance` waits and says so.
+
+What the provider cannot know:
+
+- **The operator publishes no `observedGeneration`.** Right after a change the operator has
+  not acted on yet, such as a new configuration, TLS setting or resources, its status still
+  reads `ready` and the StatefulSets still run the previous pod template, so the `Instance`
+  can read `Ready` for about one operator pass. A new size or image is caught, because the
+  operator records the sizes it counts against and the StatefulSets name their images.
+- **Availability is as old as the operator's last pass over the cluster.** The ready counts
+  are recorded then, and kept when a pass fails. A ready MySQL pod is not necessarily the
+  primary, and a group-replication member can be ready without a quorum.
+- **Operator errors are recognised by fragments of their message.** The operator has no error
+  codes, so a reworded message falls back to `EngineError`. The operator records only the
+  first error after a successful pass, so a later, different one shows the earlier message
+  until a pass succeeds.
+- **An operator error is never a terminal problem**, because the operator does not say which
+  version of the spec it is about.
+- **The runtime's pod checks do not apply yet.** The provider does not label the pods with
+  their `Instance` and component (operator 1.2.0 gives the MySQL Router pods the labels of
+  the MySQL pods, so the two could not be told apart), so crash loops, image pull failures
+  and unschedulable pods show only through the operator's counts and messages, and
+  `status.components` is not filled in.
+
 ## Topologies
 
 <!-- TODO(sdk): these blocks are hand-maintained until `provider-sdk generate` fills them
@@ -317,7 +372,7 @@ kubectl logs -n everest-system deploy/provider-percona-server-mysql -f
 
 | Symptom | Where to look |
 |---|---|
-| `Instance` stuck in `Creating` | `kubectl describe instance <name>` conditions, then the provider logs |
+| `Instance` not `Ready` | The `Ready` condition's reason and message (`kubectl describe instance <name>`), then the provider logs |
 | No `Provider` resource in the cluster | Is the chart installed? Check the provider deployment logs |
 | `Instance` ignored entirely | `spec.providerRef.name` must be `percona-server-mysql` |
 | Operator resource created but no pods | Inspect the operator's custom resource status — the failure is upstream |

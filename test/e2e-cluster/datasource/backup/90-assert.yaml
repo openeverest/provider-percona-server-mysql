@@ -17,7 +17,8 @@ kind: Instance
 metadata:
   name: ps-src
 status:
-  phase: Ready
+  phase: Provisioned
+  (conditions[?type == 'Ready'].status | [0]): "True"
 ---
 apiVersion: ps.percona.com/v1
 kind: PerconaServerMySQL
