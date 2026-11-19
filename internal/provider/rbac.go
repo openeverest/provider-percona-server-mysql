@@ -28,7 +28,8 @@ package provider
 // +kubebuilder:rbac:groups=ps.percona.com,resources=perconaservermysqlrestores,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=ps.percona.com,resources=perconaservermysqlrestores/status,verbs=get
 // +kubebuilder:rbac:groups=ps.percona.com,resources=perconaservermysqlrestores/finalizers,verbs=update
-// +kubebuilder:rbac:groups=backup.openeverest.io,resources=backupclasses,verbs=get;list;watch
+// +kubebuilder:rbac:groups=backup.openeverest.io,resources=backupclasses;backupstorageclasses,verbs=get;list;watch
+// +kubebuilder:rbac:groups=backup.openeverest.io,resources=backupclasses/status,verbs=patch
 // +kubebuilder:rbac:groups=backup.openeverest.io,resources=backupstorages,verbs=get;list;watch
 // +kubebuilder:rbac:groups=backup.openeverest.io,resources=backups,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=backup.openeverest.io,resources=backups/status,verbs=get;update;patch

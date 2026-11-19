@@ -11,6 +11,7 @@ import (
 	backupv1alpha1 "github.com/openeverest/openeverest/v2/api/backup/v1alpha1"
 	apicommon "github.com/openeverest/openeverest/v2/api/common/v1alpha1"
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
+	s3class "github.com/openeverest/openeverest/v2/backupstorageclasses/s3"
 	"github.com/openeverest/openeverest/v2/provider-runtime/controller"
 	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
 	"github.com/percona/percona-server-mysql-operator/pkg/naming"
@@ -19,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/openeverest/provider-percona-server-mysql/definition/backupclasses"
 	"github.com/openeverest/provider-percona-server-mysql/internal/common"
 )
 
@@ -30,6 +32,10 @@ var _ controller.BackupMirror = (*Provider)(nil)
 // createBackupJobFunc in pkg/controller/ps/backup.go). On-demand backups
 // created by SyncBackup carry neither this label nor naming.LabelBackupAncestor.
 const backupTypeCron = "cron"
+
+// backupClassName is the BackupClass the provider ships, defined in
+// definition/backupclasses.
+const backupClassName = "ps"
 
 // Mirror implements controller.BackupMirror (optional). The runtime invokes
 // Mirror() for operator backup events. Return a Backup CR to create it
@@ -144,7 +150,8 @@ func backupJobClusterPrefix(clusterName string) string {
 
 // applyBackupSettings translates Instance.Spec.Backup into cluster.Spec.Backup,
 // registering one PerconaServerMySQLBackup storage per InstanceBackupStorage
-// and one BackupSchedule per enabled InstanceBackupSchedule.
+// the runtime clears to render and one BackupSchedule per enabled
+// InstanceBackupSchedule on a storage the engine has.
 func applyBackupSettings(c *controller.Context, cluster *psv1.PerconaServerMySQL) error {
 	if c.Instance().Spec.Backup == nil || !c.Instance().Spec.Backup.Enabled {
 		cluster.Spec.Backup = nil
@@ -182,44 +189,42 @@ func applyBackupSettings(c *controller.Context, cluster *psv1.PerconaServerMySQL
 		return &controller.BackupConfigError{Reason: "BackupImageUnavailable", Message: "cannot resolve xtrabackup image; set componentTypes.backup in the provider's version catalog"}
 	}
 
-	for _, storage := range c.Instance().Spec.Backup.Storages {
-		if storage.StorageRef.Name == "" {
-			return &controller.BackupConfigError{Reason: "StorageReferenceMissing", Message: "backup storage entries must set storageRef.name"}
+	liveBackup := &psv1.BackupSpec{}
+	live := &psv1.PerconaServerMySQL{}
+	if err := c.Get(live, c.Name()); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("get PerconaServerMySQL: %w", err)
 		}
+	} else if live.Spec.Backup != nil {
+		liveBackup = live.Spec.Backup
+	}
 
-		bs, err := c.BackupStorage(storage.StorageRef.Name)
-		if err != nil {
-			return &controller.BackupConfigError{Reason: "StorageNotFound", Message: err.Error()}
-		}
-		if bs.Spec.Type != backupv1alpha1.BackupStorageTypeS3 || bs.Spec.S3 == nil {
-			return &controller.BackupConfigError{Reason: "StorageTypeUnsupported", Message: fmt.Sprintf("BackupStorage %q must use type s3", bs.Name)}
-		}
-
-		if _, _, err := c.BackupStorageCredentials(bs); err != nil {
-			return &controller.BackupConfigError{Reason: "StorageCredentialsError", Message: err.Error()}
-		}
-
-		opStorage := &psv1.BackupStorageSpec{
-			Type: psv1.BackupStorageS3,
-			S3: &psv1.BackupStorageS3Spec{
-				Bucket:            psv1.BucketWithPrefix(resolveBackupBucket(bs.Spec.S3.Bucket)),
-				Prefix:            string(c.Instance().UID),
-				CredentialsSecret: bs.Spec.S3.CredentialsSecretRef.Name,
-				Region:            bs.Spec.S3.Region,
-				EndpointURL:       bs.Spec.S3.EndpointURL,
-			},
-			VerifyTLS: bs.Spec.S3.VerifyTLS,
-		}
-		if bs.Spec.S3.ForcePathStyle != nil && *bs.Spec.S3.ForcePathStyle {
-			opStorage.ContainerOptions = &psv1.BackupContainerOptions{
-				Env: []corev1.EnvVar{{
-					Name:  "AWS_FORCE_PATH_STYLE",
-					Value: "true",
-				}},
+	storages, err := c.BackupStorages()
+	if err != nil {
+		return fmt.Errorf("resolve backup storages: %w", err)
+	}
+	for _, s := range storages {
+		if s.Apply() {
+			opStorage, err := renderBackupStorage(c, s)
+			if err == nil {
+				backupSpec.Storages[s.Name()] = opStorage
+				continue
 			}
+			if errors.As(err, new(apierrors.APIStatus)) && !apierrors.IsNotFound(err) {
+				return err
+			}
+			c.RejectBackupStorage(s.Name(), err)
 		}
-		backupSpec.Storages[storage.StorageRef.Name] = opStorage
+		// Hold rule: keep the storage the engine already has, never add one.
+		if held, ok := liveBackup.Storages[s.Name()]; ok {
+			backupSpec.Storages[s.Name()] = held.DeepCopy()
+		}
+	}
 
+	for _, storage := range c.Instance().Spec.Backup.Storages {
+		if _, ok := backupSpec.Storages[storage.StorageRef.Name]; !ok {
+			continue
+		}
 		for _, schedule := range storage.Schedules {
 			if !schedule.Enabled {
 				continue
@@ -244,6 +249,44 @@ func applyBackupSettings(c *controller.Context, cluster *psv1.PerconaServerMySQL
 
 	cluster.Spec.Backup = backupSpec
 	return nil
+}
+
+// renderBackupStorage builds the operator storage of an entry the runtime
+// cleared to render. The operator speaks plain S3 to every S3
+// implementation.
+func renderBackupStorage(c *controller.Context, s controller.ResolvedBackupStorage) (*psv1.BackupStorageSpec, error) {
+	s3, _, err := c.BackupStorageS3(s.Storage)
+	if err != nil {
+		return nil, err
+	}
+	tls, err := c.BackupStorageTLS(s.Storage, backupclasses.TLSSupport(backupClassName, s3class.ClassName))
+	if err != nil {
+		return nil, err
+	}
+
+	opStorage := &psv1.BackupStorageSpec{
+		Type: psv1.BackupStorageS3,
+		S3: &psv1.BackupStorageS3Spec{
+			Bucket: psv1.BucketWithPrefix(s.Storage.Spec.Location.ObjectStore.Bucket),
+			Prefix: s.Path,
+			// The operator reads AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY from it.
+			CredentialsSecret: s.Storage.Spec.Authentication.CredentialsSecretRef.Name,
+			Region:            s3.Region,
+			EndpointURL:       s3.EndpointURL,
+		},
+	}
+	if tls.InsecureSkipVerify {
+		opStorage.VerifyTLS = new(false)
+	}
+	if s3.ForcePathStyle {
+		opStorage.ContainerOptions = &psv1.BackupContainerOptions{
+			Env: []corev1.EnvVar{{
+				Name:  "AWS_FORCE_PATH_STYLE",
+				Value: "true",
+			}},
+		}
+	}
+	return opStorage, nil
 }
 
 // scheduleKeep returns the number of backups the operator keeps for the
@@ -274,12 +317,6 @@ func resolveBackupImage(c *controller.Context, providerSpec *corev1alpha1.Provid
 		}
 	}
 	return controller.GetDefaultImage(providerSpec, common.ComponentBackup)
-}
-
-// resolveBackupBucket trims any leading/trailing slashes from the configured
-// bucket name.
-func resolveBackupBucket(storageBucket string) string {
-	return strings.Trim(storageBucket, "/")
 }
 
 // OperatorBackupType implements controller.BackupMirror (optional).

@@ -41,6 +41,10 @@ spec:
       test-storage-s3:
         type: s3
         s3:
+          bucket: test-backup-bucket
+          (starts_with(prefix, 'backups/')): true
+          (contains(prefix, '/src-ps-cluster/')): true
+          (ends_with(prefix, '/test-storage-s3')): true
           region: us-east-1
           endpointUrl: http://fake
           credentialsSecret: backup-storage-credentials
