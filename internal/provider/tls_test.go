@@ -261,20 +261,20 @@ func TestValidateTLSTransition(t *testing.T) {
 			name:     "changing certificate secret rejected",
 			old:      secret("old-certs"),
 			new:      secret("new-certs"),
-			oldPhase: corev1alpha1.InstancePhaseReady,
+			oldPhase: corev1alpha1.InstancePhaseProvisioned,
 			fields:   []string{"spec.parameters.tls.certificateSecretName"},
 		},
 		{
 			name:     "changing issuer rejected",
 			old:      issuer("old-issuer"),
 			new:      issuer("new-issuer"),
-			oldPhase: corev1alpha1.InstancePhaseReady,
+			oldPhase: corev1alpha1.InstancePhaseProvisioned,
 			fields:   []string{"spec.parameters.tls.issuer"},
 		},
 		{
 			name:     "naming the default secret is no change",
 			new:      secret(testInstanceName + "-ssl"),
-			oldPhase: corev1alpha1.InstancePhaseReady,
+			oldPhase: corev1alpha1.InstancePhaseProvisioned,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
