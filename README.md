@@ -53,6 +53,7 @@ manages pods directly — all lifecycle work is delegated to the operator.
 
 | provider-percona-server-mysql | OpenEverest | Operator | Kubernetes |
 |---|---|---|---|
+| `0.3.x` | `>= 2.0.0-dev.5` | `1.2.x` | `1.30` – `1.34` |
 | `0.2.x` | `>= 2.0.0-dev.4` | `x.y.z` | `1.30` – `1.34` |
 | `0.1.x` | `>= 2.0.0-dev.4` | `x.y.z` | `1.30` – `1.34` |
 
@@ -82,7 +83,7 @@ Stateful workloads additionally report:
 |---|---|---|
 | Persistent storage | ✅ | PVC size and storage class on the engine |
 | Storage expansion | ✅ | Increase `engine.storage.size`; the StorageClass must allow expansion |
-| Backups (on demand) | ✅ | Full and incremental backups to S3 |
+| Backups (on demand) | ✅ | Full and incremental backups to `s3` BackupStorages (Amazon S3 and S3-compatible stores); `tls.insecureSkipVerify` is honoured, a custom CA (`tls.ca`) is not |
 | Backups (scheduled) | ✅ | Cron schedules with retention, S3 only |
 | Point-in-time recovery | ❌ | |
 | Restore | ✅ | From a backup of the same instance; not point-in-time |

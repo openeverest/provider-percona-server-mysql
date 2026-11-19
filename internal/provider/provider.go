@@ -11,6 +11,7 @@ import (
 	backupv1alpha1 "github.com/openeverest/openeverest/v2/api/backup/v1alpha1"
 	monitoringv1alpha1 "github.com/openeverest/openeverest/v2/api/monitoring/v1alpha1"
 	"github.com/openeverest/openeverest/v2/provider-runtime/controller"
+	"github.com/openeverest/provider-percona-server-mysql/definition/backupclasses"
 	"github.com/openeverest/provider-percona-server-mysql/internal/common"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -51,6 +52,7 @@ func New() *Provider {
 			),
 		},
 	}
+	p.SetShippedBackupClasses(backupclasses.Shipped())
 	return p
 }
 
