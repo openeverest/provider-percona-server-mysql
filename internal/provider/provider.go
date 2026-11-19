@@ -166,14 +166,15 @@ func (p *Provider) Sync(c *controller.Context) error {
 		)
 	}
 
-	if engine.Replicas == nil {
+	size, ok := engineReplicas(c.Instance())
+	if !ok {
 		return fmt.Errorf(
 			"instance spec missing %q component replicas",
 			common.ComponentEngine,
 		)
 	}
 
-	cluster.Spec.MySQL.Size = *engine.Replicas
+	cluster.Spec.MySQL.Size = size
 
 	if engine.Resources != nil {
 		cluster.Spec.MySQL.Resources = *engine.Resources

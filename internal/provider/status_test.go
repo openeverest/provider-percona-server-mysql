@@ -688,3 +688,82 @@ func TestEnqueueOperatorRestoreInstance(t *testing.T) {
 		enqueue(context.Background(), opRestore("r", psv1.RestoreRunning, 1)))
 	assert.Empty(t, enqueue(context.Background(), &psv1.PerconaServerMySQLRestore{}))
 }
+
+func TestDesiredReplicas(t *testing.T) {
+	t.Parallel()
+
+	async := func(spec *corev1alpha1.InstanceSpec) {
+		spec.Topology = &corev1alpha1.TopologySpec{Type: common.TopologyAsync}
+	}
+	component := func(name string, comp corev1alpha1.ComponentSpec) func(*corev1alpha1.InstanceSpec) {
+		return func(spec *corev1alpha1.InstanceSpec) { spec.Components[name] = comp }
+	}
+	without := func(name string) func(*corev1alpha1.InstanceSpec) {
+		return func(spec *corev1alpha1.InstanceSpec) { delete(spec.Components, name) }
+	}
+
+	tests := []struct {
+		name string
+		spec corev1alpha1.InstanceSpec
+		objs []client.Object
+		want []controller.ComponentReplicas
+	}{
+		{
+			name: "what the Instance asks for, before the PerconaServerMySQL object exists",
+			spec: statusInstance(),
+			want: []controller.ComponentReplicas{{Component: common.ComponentEngine, Desired: 3}, {Component: common.ComponentProxy, Desired: 1}},
+		},
+		{
+			name: "defaults for the orchestrator and the proxy of an asynchronous cluster",
+			spec: statusInstance(async,
+				component(common.ComponentOrchestrator, corev1alpha1.ComponentSpec{Type: common.ComponentTypeOrchestrator}),
+				component(common.ComponentProxy, corev1alpha1.ComponentSpec{Type: common.ProxyTypeHAProxy}),
+			),
+			objs: []client.Object{readyCluster(asyncWithOrchestrator)},
+			want: []controller.ComponentReplicas{
+				{Component: common.ComponentEngine, Desired: 3},
+				{Component: common.ComponentOrchestrator, Desired: 3},
+				{Component: common.ComponentProxy, Desired: 2},
+			},
+		},
+		{
+			name: "a group-replication cluster runs no orchestrator",
+			spec: statusInstance(component(common.ComponentOrchestrator, corev1alpha1.ComponentSpec{Type: common.ComponentTypeOrchestrator, Replicas: new(int32(3))})),
+			objs: []client.Object{readyCluster()},
+			want: []controller.ComponentReplicas{
+				{Component: common.ComponentEngine, Desired: 3},
+				{Component: common.ComponentOrchestrator, Desired: 0},
+				{Component: common.ComponentProxy, Desired: 1},
+			},
+		},
+		{
+			name: "without a proxy",
+			spec: statusInstance(without(common.ComponentProxy)),
+			objs: []client.Object{readyCluster()},
+			want: []controller.ComponentReplicas{{Component: common.ComponentEngine, Desired: 3}},
+		},
+		{
+			name: "the Instance's sizes, not the ones on the object",
+			spec: statusInstance(component(common.ComponentEngine, corev1alpha1.ComponentSpec{Type: common.ComponentTypeMysql, Replicas: new(int32(5))})),
+			objs: []client.Object{readyCluster()},
+			want: []controller.ComponentReplicas{{Component: common.ComponentEngine, Desired: 5}, {Component: common.ComponentProxy, Desired: 1}},
+		},
+		{
+			name: "kept while the cluster is paused on its object",
+			spec: statusInstance(),
+			objs: []client.Object{readyCluster(paused)},
+			want: []controller.ComponentReplicas{{Component: common.ComponentEngine, Desired: 3}, {Component: common.ComponentProxy, Desired: 1}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			c := statusContext(t, tt.spec, tt.objs...)
+
+			st, err := clusterStatus(c)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, st.DesiredReplicas)
+		})
+	}
+}

@@ -22,6 +22,8 @@ import (
 
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
 	"github.com/openeverest/openeverest/v2/provider-runtime/controller"
+
+	"github.com/openeverest/provider-percona-server-mysql/internal/common"
 )
 
 // Reasons of the problems the provider reports. A problem's reason becomes
@@ -138,12 +140,13 @@ type workloads struct {
 
 // clusterStatus reports what the provider observes about the cluster: whether
 // it runs what the Instance asks for, whether clients can connect, what is
-// wrong and which long operation is running. The runtime derives the Instance's phase and conditions from these
+// wrong and which long operation is running, and how many pods each component
+// will have. The runtime derives the Instance's phase and conditions from these
 // facts.
 func clusterStatus(c *controller.Context) (controller.Status, error) {
 	cluster, err := uncachedCluster(c)
 	if apierrors.IsNotFound(err) {
-		return controller.Progressing("Waiting for the PerconaServerMySQL object to be created"), nil
+		return withDesiredReplicas(c, controller.Progressing("Waiting for the PerconaServerMySQL object to be created")), nil
 	}
 	if err != nil {
 		return controller.Status{}, err
@@ -173,6 +176,7 @@ func clusterStatus(c *controller.Context) (controller.Status, error) {
 				fmt.Sprintf("Rolling out image %s (the MySQL pods were running %s)", cluster.Spec.MySQL.Image, from))
 		}
 	}
+	st = withDesiredReplicas(c, st)
 
 	// The connection details are reported as soon as clients can connect,
 	// not only once the cluster has converged: whoever is told the database
@@ -339,6 +343,26 @@ func observe(cluster *psv1.PerconaServerMySQL, loads workloads, restore restoreS
 
 	st.Message = waitingFor(cluster, loads, restore, pause)
 	st.Converged = st.Message == ""
+	return st
+}
+
+// withDesiredReplicas reports how many pods each component will have once the
+// cluster runs what the Instance asks for. The counts come from the Instance,
+// with the defaults Sync applies, not from the PerconaServerMySQL object,
+// which may still describe an earlier spec. A cluster paused on that object
+// keeps them: the Instance does not ask for the pause. The backup component
+// has no pods of its own.
+func withDesiredReplicas(c *controller.Context, st controller.Status) controller.Status {
+	in := c.Instance()
+	if n, ok := engineReplicas(in); ok {
+		st = st.WithDesiredReplicas(common.ComponentEngine, n)
+	}
+	if n, ok := orchestratorReplicas(in); ok {
+		st = st.WithDesiredReplicas(common.ComponentOrchestrator, n)
+	}
+	if n, ok := proxyReplicas(in); ok {
+		st = st.WithDesiredReplicas(common.ComponentProxy, n)
+	}
 	return st
 }
 

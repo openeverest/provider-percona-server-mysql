@@ -73,9 +73,10 @@ func applyOrchestrator(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance,
 		return fmt.Errorf("cannot resolve image for %q component", common.ComponentOrchestrator)
 	}
 
+	size, _ := orchestratorReplicas(inst)
 	out := psv1.OrchestratorSpec{
 		Enabled: true,
-		PodSpec: componentPodSpec(orch, image, defaultOrchestratorSize),
+		PodSpec: componentPodSpec(orch, image, size),
 	}
 	if orch.Service != nil {
 		out.Expose = serviceExposeFromComponent(orch.Service)
