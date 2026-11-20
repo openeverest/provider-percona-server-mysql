@@ -53,7 +53,7 @@ manages pods directly — all lifecycle work is delegated to the operator.
 
 | provider-percona-server-mysql | OpenEverest | Operator | Kubernetes |
 |---|---|---|---|
-| `0.3.x` | `>= 2.0.0-dev.5` | `1.2.x` | `1.30` – `1.34` |
+| `0.3.x` | `2.0.0-alpha.1` | `1.2.x` | `1.32` – `1.34` |
 | `0.2.x` | `>= 2.0.0-dev.4` | `x.y.z` | `1.30` – `1.34` |
 | `0.1.x` | `>= 2.0.0-dev.4` | `x.y.z` | `1.30` – `1.34` |
 
