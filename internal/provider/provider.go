@@ -235,7 +235,7 @@ func (p *Provider) Status(
 
 	if err := c.Get(cluster, c.Name()); err != nil {
 		if errors.IsNotFound(err) {
-			return controller.Provisioning("waiting for PerconaServerMySQL resource"), nil
+			return controller.Progressing("waiting for PerconaServerMySQL resource"), nil
 		}
 
 		return controller.Status{}, fmt.Errorf("get PerconaServerMySQL %q: %w", c.Name(), err)
@@ -267,11 +267,11 @@ func (p *Provider) Status(
 	case psv1.StateError:
 		return controller.Failed("PerconaServerMySQL cluster is in error state"), nil
 	case psv1.StatePaused, psv1.StateStopping:
-		return controller.Provisioning("PerconaServerMySQL cluster is paused"), nil
+		return controller.Progressing("PerconaServerMySQL cluster is paused"), nil
 	case psv1.StateInitializing:
-		return controller.Initializing("PerconaServerMySQL cluster is initializing"), nil
+		return controller.Progressing("PerconaServerMySQL cluster is initializing"), nil
 	default:
-		return controller.Provisioning("waiting for PerconaServerMySQL to become ready"), nil
+		return controller.Progressing("waiting for PerconaServerMySQL to become ready"), nil
 	}
 }
 
