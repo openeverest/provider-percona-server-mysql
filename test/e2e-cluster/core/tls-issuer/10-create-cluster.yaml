@@ -1,5 +1,5 @@
-# Async + HAProxy is the smallest topology the operator will actually start
-# (see test/e2e-cluster/datasource/backup/30-create-source.yaml).
+# Async + HAProxy + one orchestrator: without the orchestrator component the
+# PS operator's CEL rules reject the CR (spec.orchestrator is omitted).
 apiVersion: core.openeverest.io/v1alpha1
 kind: Instance
 metadata:
@@ -24,6 +24,9 @@ spec:
           memory: 1Gi
     proxy:
       type: haproxy
+      replicas: 1
+    orchestrator:
+      type: orchestrator
       replicas: 1
   parameters:
     tls:
