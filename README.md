@@ -320,6 +320,7 @@ kubectl logs -n everest-system deploy/provider-percona-server-mysql -f
 | `Instance` stuck in `Creating` | `kubectl describe instance <name>` conditions, then the provider logs |
 | No `Provider` resource in the cluster | Is the chart installed? Check the provider deployment logs |
 | `Instance` ignored entirely | `spec.providerRef.name` must be `percona-server-mysql` |
+| New provider pod running but never `Ready` | It waits until the installed OpenEverest supports this build: the Warning Event in `kubectl describe provider percona-server-mysql` says why |
 | Operator resource created but no pods | Inspect the operator's custom resource status — the failure is upstream |
 
 <!-- TODO(provider): add technology-specific gotchas (sysctl limits, storage class or GPU
