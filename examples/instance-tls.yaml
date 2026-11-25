@@ -1,0 +1,25 @@
+# An instance whose certificate a company CA signs through a cert-manager
+# Issuer, valid for the external name clients use as well, and that rejects
+# clients without TLS. See the README section "Bring your own CA".
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: mydb
+  namespace: default
+spec:
+  providerRef:
+    name: percona-server-mysql
+  components:
+    engine:
+      type: mysql
+      replicas: 3
+      storage:
+        size: 10Gi
+  parameters:
+    tls:
+      mode: requireTLS
+      issuer:
+        name: company-ca
+        kind: Issuer
+      additionalNames:
+        - mydb.company.com

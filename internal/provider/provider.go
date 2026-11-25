@@ -179,6 +179,7 @@ func (p *Provider) Sync(c *controller.Context) error {
 	if err := applyEngineConfiguration(cluster, engine); err != nil {
 		return fmt.Errorf("apply engine configuration: %w", err)
 	}
+	applyTLSMode(cluster, tls)
 
 	applyEngineExpose(cluster, engine)
 
@@ -213,6 +214,10 @@ func (p *Provider) Sync(c *controller.Context) error {
 
 	if err := applyBackupSettings(c, cluster); err != nil {
 		return fmt.Errorf("apply backup settings: %w", err)
+	}
+
+	if err := gateTLSNames(c, cluster); err != nil {
+		return fmt.Errorf("gate TLS names: %w", err)
 	}
 
 	if err := c.Apply(cluster); err != nil {

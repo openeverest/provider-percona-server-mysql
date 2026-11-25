@@ -42,3 +42,7 @@ package provider
 // +kubebuilder:rbac:groups=monitoring.openeverest.io,resources=monitoringclasses;monitoringdestinations;monitoringbindings,verbs=get;list;watch
 // +kubebuilder:rbac:groups=monitoring.openeverest.io,resources=monitoringbindings/status,verbs=patch
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get
+
+// Allow reissuing the instance's certificate when its additional names change:
+// the operator never updates a cert-manager Certificate signed by the user's issuer.
+// +kubebuilder:rbac:groups=cert-manager.io,resources=certificates,verbs=get;patch
