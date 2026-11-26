@@ -57,11 +57,6 @@ manages pods directly — all lifecycle work is delegated to the operator.
 | `0.2.x` | `>= 2.0.0-dev.4` | `x.y.z` | `1.30` – `1.34` |
 | `0.1.x` | `>= 2.0.0-dev.4` | `x.y.z` | `1.30` – `1.34` |
 
-Each chart also names the OpenEverest it is built for, in the `openeverest.io/contract-version`
-annotation of its `Chart.yaml`, which `make generate` writes. A Helm install on an OpenEverest
-that does not serve that version fails, and a build applied any other way waits, unready,
-until OpenEverest serves it; see [Installation](#installation).
-
 ## Capabilities
 
 <!-- TODO(provider): the rows below are the standard set across all OpenEverest providers.
@@ -116,26 +111,6 @@ cert-manager issue it, or supply one through `admission.certs`. If the provider 
 writes are admitted and the `Instance` reports the errors in its `Ready` condition. A
 missing object the `Instance` names, such as its user Secret, is never a reason to reject
 it: `kubectl` prints a warning, and the `Instance` reports it once created.
-
-With Helm or Flux, the install fails, before anything is applied, when the OpenEverest in the
-cluster does not serve the OpenEverest the chart is built for, and the error names the
-OpenEverest it needs. Argo CD, and any tool that applies pre-rendered manifests, renders the
-chart without reading the cluster, so that check passes there. Whichever tool applies it, a
-new build of the provider that the installed OpenEverest does not support stays alive but
-unready until OpenEverest does, while the previous build, if any, keeps serving; a Warning
-Event on the `Provider` says why (see [Troubleshooting](#troubleshooting)).
-
-To install anyway, set `compatibility.acknowledge.coreVersion` to the OpenEverest version the
-cluster runs, which the error also names. The chart writes it on the `Provider`, its
-`BackupClass` and the presets as `openeverest.io/compatibility-acknowledged`, and the provider
-reads it on its `Provider` at startup, so it lets a held build start too. It holds on that
-release and on later ones that keep its contract, such as its patch releases, and expires with
-the first OpenEverest release that changes the contract, which is checked again.
-
-The chart sets no annotation for any tool itself: `openeverest.annotations` adds annotations
-to the `Provider`, its `BackupClass` and the presets, such as
-`argocd.argoproj.io/sync-wave: "-1"` to have Argo CD apply them before the provider's
-`Deployment` and the bundled operator.
 
 Upgrade and uninstall:
 
@@ -353,16 +328,15 @@ local k3d setup, running against a cluster you already have, and every `dev/.env
 
 ```bash
 make dev-up             # local cluster + Tilt dev environment (see dev/README.md)
-make generate           # RBAC, provider spec, Helm chart sync, OpenEverest stamp
+make generate           # RBAC, provider spec, Helm chart sync
 make run                # run the provider locally against the cluster
 make test-unit
 make test-integration   # chainsaw suites under test/integration/
 make dev-down
 ```
 
-`make help` lists every target. `make verify` fails when generated files are stale or the
-chart is not stamped with the OpenEverest the provider is built against — run `make generate`
-and commit the result.
+`make help` lists every target. `make verify` fails when generated files are stale — run
+`make generate` and commit the result.
 
 The provider contract (`Validate` / `Sync` / `Status` / `Cleanup`), RBAC markers, watches,
 code generation, and the backup/restore interfaces are documented once for all providers in
@@ -376,7 +350,7 @@ code generation, and the backup/restore interfaces are documented once for all p
 | `internal/provider/` | `ProviderInterface` implementation, backup interfaces, RBAC markers |
 | `internal/common/` | Component name constants |
 | `definition/` | Provider identity, component types, versions, topologies, backup classes |
-| `charts/provider-percona-server-mysql/` | Helm chart (`generated/`, the `Chart.yaml` stamp, `templates/_openeverest_contract.tpl` and `templates/openeverest-compat-check.yaml` are produced by `make generate`) |
+| `charts/provider-percona-server-mysql/` | Helm chart (`generated/` is produced by `make generate`) |
 | `config/rbac/role.yaml` | Generated `ClusterRole` — do not edit |
 | `test/integration/` | Chainsaw suites (see its `README.md`) |
 | `test/vars.sh` | Pinned operator and workload versions used by tests |
@@ -411,7 +385,6 @@ kubectl logs -n everest-system deploy/provider-percona-server-mysql -f
 | `Instance` stuck in `Creating` | `kubectl describe instance <name>` conditions, then the provider logs |
 | No `Provider` resource in the cluster | Is the chart installed? Check the provider deployment logs |
 | `Instance` ignored entirely | `spec.providerRef.name` must be `percona-server-mysql` |
-| New provider pod running but never `Ready` | It waits until the installed OpenEverest supports this build: the Warning Event in `kubectl describe provider percona-server-mysql` says why |
 | Operator resource created but no pods | Inspect the operator's custom resource status — the failure is upstream |
 
 <!-- TODO(provider): add technology-specific gotchas (sysctl limits, storage class or GPU
