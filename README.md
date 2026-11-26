@@ -73,7 +73,7 @@ provider itself is covered under [Installation](#installation).
 
 | Capability | Status | Notes |
 |---|---|---|
-| Provisioning | ✅ | `async` and `groupreplication` topologies |
+| Provisioning | ✅ | `async` and `groupreplication` topologies. On `async`, a failover recovers the transactions the failed primary had not shipped only when backups are enabled; without them, Orchestrator promotes a replica and those transactions are lost |
 | Horizontal scaling | ✅ | Engine, proxy, and orchestrator replica counts |
 | Vertical scaling (CPU / memory) | ✅ | Requests and limits on the engine and proxy |
 | Version upgrades | ❌ | Version is selected at create time |
@@ -280,9 +280,8 @@ spec:
   2. a cert-manager `issuer` — requires cert-manager installed in the cluster. External
      issuers (another `group`, such as AWS Private CA) are rejected until the operator supports
      them ([K8SPS-989](https://perconadev.atlassian.net/browse/K8SPS-989)). `ClusterIssuer`
-     needs PS operator 1.3.0 or later
-     ([K8SPS-649](https://perconadev.atlassian.net/browse/K8SPS-649)): 1.2.0 only looks up a
-     namespaced `Issuer` of that name;
+     needs PS operator 1.3.0 or later, which the chart bundles
+     ([K8SPS-649](https://perconadev.atlassian.net/browse/K8SPS-649));
   3. otherwise the operator issues it: through cert-manager with a CA of its own when
      cert-manager is installed, or else from a self-signed CA it creates for the instance.
 

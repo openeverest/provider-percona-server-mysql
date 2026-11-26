@@ -215,6 +215,7 @@ func (p *Provider) Sync(c *controller.Context) error {
 	if err := applyBackupSettings(c, cluster); err != nil {
 		return fmt.Errorf("apply backup settings: %w", err)
 	}
+	cluster.Spec.Unsafe.AsyncFailoverWithPossibleDataLoss = asyncFailoverRequiresUnsafe(topologyType, cluster)
 
 	if err := gateTLSNames(c, cluster); err != nil {
 		return fmt.Errorf("gate TLS names: %w", err)

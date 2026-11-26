@@ -284,3 +284,26 @@ func instanceWithTopology(topology string, components map[string]corev1alpha1.Co
 func ptr32(v int32) *int32 {
 	return &v
 }
+
+func TestAsyncFailoverRequiresUnsafe(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		topology string
+		backup   *psv1.BackupSpec
+		want     bool
+	}{
+		{name: "async without backups", topology: common.TopologyAsync, want: true},
+		{name: "async with backups disabled", topology: common.TopologyAsync, backup: &psv1.BackupSpec{Enabled: false}, want: true},
+		{name: "async with backups", topology: common.TopologyAsync, backup: &psv1.BackupSpec{Enabled: true}},
+		{name: "group-replication without backups", topology: common.TopologyGroupReplication},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cr := &psv1.PerconaServerMySQL{Spec: psv1.PerconaServerMySQLSpec{Backup: tt.backup}}
+			assert.Equal(t, tt.want, asyncFailoverRequiresUnsafe(tt.topology, cr))
+		})
+	}
+}

@@ -18,12 +18,24 @@ func effectiveTopologyType(inst *corev1alpha1.Instance) string {
 	return common.TopologyGroupReplication
 }
 
+// Safe sizes the operator's CRD validation enforces unless the matching
+// unsafeFlags field is set. The operator dropped its Go constants for these
+// in 1.3.0, so they mirror the x-kubernetes-validations rules of the
+// PerconaServerMySQL CRD.
+const (
+	minSafeAsyncSize        = 2
+	minSafeGRSize           = 3
+	maxSafeGRSize           = 9
+	minSafeRouterSize       = 2
+	minSafeOrchestratorSize = 3
+)
+
 func mysqlSizeRequiresUnsafe(topology string, size int32) bool {
 	switch topology {
 	case common.TopologyAsync:
-		return size < psv1.MinSafeAsyncSize
+		return size < minSafeAsyncSize
 	case common.TopologyGroupReplication:
-		return size < psv1.MinSafeGRSize || size >= psv1.MaxSafeGRSize || size%2 == 0
+		return size < minSafeGRSize || size >= maxSafeGRSize || size%2 == 0
 	default:
 		return false
 	}
@@ -31,21 +43,30 @@ func mysqlSizeRequiresUnsafe(topology string, size int32) bool {
 
 // orchestratorSizeRequiresUnsafe reports whether an enabled orchestrator's
 // size falls outside the operator's safe range for async replication: the
-// operator requires the size to be odd and >= 3 (psv1.MinSafeGRSize) unless
+// operator requires the size to be odd and >= 3 unless
 // unsafeFlags.orchestratorSize is set.
 func orchestratorSizeRequiresUnsafe(size int32) bool {
-	return size < psv1.MinSafeGRSize || size%2 == 0
+	return size < minSafeOrchestratorSize || size%2 == 0
 }
 
 // proxySizeRequiresUnsafe reports whether an enabled MySQL Router's size
-// falls below the operator's safe minimum for group-replication
-// (psv1.MinSafeProxySize) unless unsafeFlags.proxySize is set. HAProxy has
-// no equivalent minimum in the operator, so it always returns false.
+// falls below the operator's safe minimum for group-replication unless
+// unsafeFlags.proxySize is set. HAProxy has no equivalent minimum in the
+// operator, so it always returns false.
 func proxySizeRequiresUnsafe(proxyType string, size int32) bool {
 	if proxyType != common.ProxyTypeRouter {
 		return false
 	}
-	return size < psv1.MinSafeProxySize
+	return size < minSafeRouterSize
+}
+
+// asyncFailoverRequiresUnsafe reports whether an async cluster runs without
+// backups. Since 1.3.0 the operator recovers the transactions stranded on a
+// failed primary from the backup sidecar, and accepts an async cluster
+// without backups only with unsafeFlags.asyncFailoverWithPossibleDataLoss:
+// Orchestrator then promotes a replica on its own, as before 1.3.0.
+func asyncFailoverRequiresUnsafe(topology string, cr *psv1.PerconaServerMySQL) bool {
+	return topology == common.TopologyAsync && !cr.BackupEnabled()
 }
 
 func imageForComponentType(spec *corev1alpha1.ProviderSpec, componentType, version, override string) string {
