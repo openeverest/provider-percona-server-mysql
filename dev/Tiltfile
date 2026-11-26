@@ -43,6 +43,12 @@ install_openeverest = str2bool(os.getenv('INSTALL_OPENEVEREST', 'true'))
 # provider cannot use. A range such as `>=2.0.0-0 <3.0.0` picks the wrong one:
 # SemVer sorts pre-release labels alphabetically, so 2.0.0-dev.4 ranks above
 # 2.0.0-alpha.1. Move this together with the core version in go.mod.
+#
+# While go.mod requires a commit of core main whose contract has changed since
+# the last release (the chart's stamp is then a development value, such as
+# 2.0.0-alpha.1.next), no released core serves this provider: the chart
+# refuses to install on it, and the provider would stay unready. Run the core
+# from that commit instead, with INSTALL_OPENEVEREST=false (see dev/README.md).
 openeverest_version = os.getenv('OPENEVEREST_VERSION', '2.0.0-alpha.1')
 
 # Helm repository that hosts the OpenEverest core chart.
