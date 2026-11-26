@@ -18,34 +18,21 @@ func effectiveTopologyType(inst *corev1alpha1.Instance) string {
 	return common.TopologyGroupReplication
 }
 
-func mysqlSizeRequiresUnsafe(topology string, size int32) bool {
-	switch topology {
-	case common.TopologyAsync:
-		return size < psv1.MinSafeAsyncSize
-	case common.TopologyGroupReplication:
-		return size < psv1.MinSafeGRSize || size >= psv1.MaxSafeGRSize || size%2 == 0
-	default:
-		return false
-	}
-}
-
-// orchestratorSizeRequiresUnsafe reports whether an enabled orchestrator's
-// size falls outside the operator's safe range for async replication: the
-// operator requires the size to be odd and >= 3 (psv1.MinSafeGRSize) unless
-// unsafeFlags.orchestratorSize is set.
-func orchestratorSizeRequiresUnsafe(size int32) bool {
-	return size < psv1.MinSafeGRSize || size%2 == 0
-}
-
-// proxySizeRequiresUnsafe reports whether an enabled MySQL Router's size
-// falls below the operator's safe minimum for group-replication
-// (psv1.MinSafeProxySize) unless unsafeFlags.proxySize is set. HAProxy has
-// no equivalent minimum in the operator, so it always returns false.
-func proxySizeRequiresUnsafe(proxyType string, size int32) bool {
-	if proxyType != common.ProxyTypeRouter {
-		return false
-	}
-	return size < psv1.MinSafeProxySize
+// allowAnyLayout turns off the operator's opinions on what a production
+// cluster looks like, so any layout the Instance asks for is accepted, such
+// as a single node with a single proxy for development. These flags only
+// relax the operator's CRD validation: MySQL size (async >= 2,
+// group-replication odd and 3..8), Router size >= 2, Orchestrator size odd
+// and >= 3, and async without backups, where a failover cannot recover the
+// transactions stranded on the old primary.
+//
+// unsafeFlags.proxy and unsafeFlags.orchestrator are set by applyProxy and
+// applyOrchestrator instead: the operator reads them to decide what to run.
+func allowAnyLayout(cr *psv1.PerconaServerMySQL) {
+	cr.Spec.Unsafe.MySQLSize = true
+	cr.Spec.Unsafe.ProxySize = true
+	cr.Spec.Unsafe.OrchestratorSize = true
+	cr.Spec.Unsafe.AsyncFailoverWithPossibleDataLoss = true
 }
 
 func imageForComponentType(spec *corev1alpha1.ProviderSpec, componentType, version, override string) string {

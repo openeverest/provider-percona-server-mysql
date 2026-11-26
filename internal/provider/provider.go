@@ -194,9 +194,7 @@ func (p *Provider) Sync(c *controller.Context) error {
 		return fmt.Errorf("instance spec has unsupported topology type %q", topologyType)
 	}
 
-	if mysqlSizeRequiresUnsafe(topologyType, cluster.Spec.MySQL.Size) {
-		cluster.Spec.Unsafe.MySQLSize = true
-	}
+	allowAnyLayout(cluster)
 
 	cluster.Spec.MySQL.AutoRecovery = true
 

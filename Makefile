@@ -15,7 +15,7 @@ OPENEVEREST_REF ?= $(shell sed -n 's/.*"Hash":"\([0-9a-f]*\)".*/\1/p' \
 # Percona Server for MySQL operator version whose CRDs match the API types
 # vendored in go.mod (github.com/percona/percona-server-mysql-operator).
 # Keep this in sync with go.mod when bumping the operator dependency.
-PS_OPERATOR_VERSION ?= 1.2.0
+PS_OPERATOR_VERSION ?= 1.3.0
 
 # PS operator replicas to deploy alongside the provider in integration envs.
 # CI sets this to 0 so suites simulate operator status.

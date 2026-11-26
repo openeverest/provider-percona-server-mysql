@@ -194,36 +194,6 @@ func TestApplyOrchestrator(t *testing.T) {
 		}
 	})
 
-	t.Run("undersized or even size sets unsafeFlags.orchestratorSize", func(t *testing.T) {
-		t.Parallel()
-		for _, size := range []int32{1, 2, 4} {
-			cr := &psv1.PerconaServerMySQL{}
-			inst := instanceWithTopology(common.TopologyAsync, map[string]corev1alpha1.ComponentSpec{
-				common.ComponentOrchestrator: {Replicas: ptr32(size)},
-			})
-			if err := applyOrchestrator(cr, inst, spec); err != nil {
-				t.Fatal(err)
-			}
-			if !cr.Spec.Unsafe.OrchestratorSize {
-				t.Fatalf("size %d: expected unsafeFlags.orchestratorSize to be set", size)
-			}
-		}
-	})
-
-	t.Run("safe odd size clears unsafeFlags.orchestratorSize", func(t *testing.T) {
-		t.Parallel()
-		cr := &psv1.PerconaServerMySQL{}
-		inst := instanceWithTopology(common.TopologyAsync, map[string]corev1alpha1.ComponentSpec{
-			common.ComponentOrchestrator: {Replicas: ptr32(5)},
-		})
-		if err := applyOrchestrator(cr, inst, spec); err != nil {
-			t.Fatal(err)
-		}
-		if cr.Spec.Unsafe.OrchestratorSize {
-			t.Fatal("expected unsafeFlags.orchestratorSize to be cleared for a safe size")
-		}
-	})
-
 	t.Run("group-replication ignores orchestrator component", func(t *testing.T) {
 		t.Parallel()
 		cr := &psv1.PerconaServerMySQL{}

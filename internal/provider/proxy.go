@@ -34,9 +34,7 @@ func proxyTypeOf(comp corev1alpha1.ComponentSpec, topology string) string {
 //   - group-replication: haproxy or router
 //
 // Omitting the component is allowed; applyProxy sets unsafeFlags.proxy.
-// Router sizes below the operator's safe minimum on group-replication are
-// not rejected here: applyProxy sets unsafeFlags.proxySize so the operator
-// accepts them, mirroring how mysqlSizeRequiresUnsafe handles MySQL sizing.
+// Any size of at least 1 is allowed (see allowAnyLayout).
 func validateProxy(inst *corev1alpha1.Instance) field.ErrorList {
 	proxy, enabled := inst.Spec.Components[common.ComponentProxy]
 	if !enabled {
@@ -124,6 +122,5 @@ func applyProxy(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance, spec *
 	default:
 		return fmt.Errorf("unsupported proxy type %q", proxyType)
 	}
-	cr.Spec.Unsafe.ProxySize = proxySizeRequiresUnsafe(proxyType, pod.Size)
 	return nil
 }
