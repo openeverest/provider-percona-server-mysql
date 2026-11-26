@@ -17,9 +17,7 @@ const defaultOrchestratorSize int32 = 3
 //   - async: the component may be omitted only because applyOrchestrator will
 //     set unsafeFlags.orchestrator; when present, size must be >= 1.
 //
-// Sizes below the operator's safe range (odd, >= 3) are not rejected here:
-// applyOrchestrator sets unsafeFlags.orchestratorSize so the operator accepts
-// them, mirroring how mysqlSizeRequiresUnsafe handles MySQL sizing.
+// Any size of at least 1 is allowed (see allowAnyLayout).
 func validateOrchestrator(inst *corev1alpha1.Instance) field.ErrorList {
 	if effectiveTopologyType(inst) == common.TopologyGroupReplication {
 		return nil
@@ -83,7 +81,6 @@ func applyOrchestrator(cr *psv1.PerconaServerMySQL, inst *corev1alpha1.Instance,
 
 	cr.Spec.Orchestrator = out
 	cr.Spec.Unsafe.Orchestrator = false
-	cr.Spec.Unsafe.OrchestratorSize = orchestratorSizeRequiresUnsafe(out.Size)
 	return applyToolkit(cr, spec, topology)
 }
 

@@ -194,9 +194,7 @@ func (p *Provider) Sync(c *controller.Context) error {
 		return fmt.Errorf("instance spec has unsupported topology type %q", topologyType)
 	}
 
-	if mysqlSizeRequiresUnsafe(topologyType, cluster.Spec.MySQL.Size) {
-		cluster.Spec.Unsafe.MySQLSize = true
-	}
+	allowAnyLayout(cluster)
 
 	cluster.Spec.MySQL.AutoRecovery = true
 
@@ -215,7 +213,6 @@ func (p *Provider) Sync(c *controller.Context) error {
 	if err := applyBackupSettings(c, cluster); err != nil {
 		return fmt.Errorf("apply backup settings: %w", err)
 	}
-	cluster.Spec.Unsafe.AsyncFailoverWithPossibleDataLoss = asyncFailoverRequiresUnsafe(topologyType, cluster)
 
 	if err := gateTLSNames(c, cluster); err != nil {
 		return fmt.Errorf("gate TLS names: %w", err)

@@ -73,7 +73,7 @@ provider itself is covered under [Installation](#installation).
 
 | Capability | Status | Notes |
 |---|---|---|
-| Provisioning | ✅ | `async` and `groupreplication` topologies. On `async`, a failover recovers the transactions the failed primary had not shipped only when backups are enabled; without them, Orchestrator promotes a replica and those transactions are lost |
+| Provisioning | ✅ | `async` and `groupreplication` topologies. Any layout is accepted, down to a single node with a single proxy for development: the provider does not apply the operator's production sizing rules (odd group-replication sizes, two or more Routers, three or more Orchestrator nodes). On `async`, a failover recovers the transactions the failed primary had not shipped only when backups are enabled; without them, Orchestrator promotes a replica and those transactions are lost |
 | Horizontal scaling | ✅ | Engine, proxy, and orchestrator replica counts |
 | Vertical scaling (CPU / memory) | ✅ | Requests and limits on the engine and proxy |
 | Version upgrades | ❌ | Version is selected at create time |

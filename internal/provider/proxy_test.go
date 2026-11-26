@@ -208,48 +208,6 @@ func TestApplyProxy(t *testing.T) {
 		}
 	})
 
-	t.Run("undersized router sets unsafeFlags.proxySize", func(t *testing.T) {
-		t.Parallel()
-		cr := &psv1.PerconaServerMySQL{}
-		inst := instanceWithTopology(common.TopologyGroupReplication, map[string]corev1alpha1.ComponentSpec{
-			common.ComponentProxy: {Type: common.ProxyTypeRouter, Replicas: ptr32(1)},
-		})
-		if err := applyProxy(cr, inst, spec); err != nil {
-			t.Fatal(err)
-		}
-		if !cr.Spec.Unsafe.ProxySize {
-			t.Fatal("expected unsafeFlags.proxySize to be set for router size below minimum")
-		}
-	})
-
-	t.Run("safe router size clears unsafeFlags.proxySize", func(t *testing.T) {
-		t.Parallel()
-		cr := &psv1.PerconaServerMySQL{}
-		inst := instanceWithTopology(common.TopologyGroupReplication, map[string]corev1alpha1.ComponentSpec{
-			common.ComponentProxy: {Type: common.ProxyTypeRouter, Replicas: ptr32(2)},
-		})
-		if err := applyProxy(cr, inst, spec); err != nil {
-			t.Fatal(err)
-		}
-		if cr.Spec.Unsafe.ProxySize {
-			t.Fatal("expected unsafeFlags.proxySize to be cleared for a safe router size")
-		}
-	})
-
-	t.Run("haproxy never sets unsafeFlags.proxySize", func(t *testing.T) {
-		t.Parallel()
-		cr := &psv1.PerconaServerMySQL{}
-		inst := instanceWithTopology(common.TopologyAsync, map[string]corev1alpha1.ComponentSpec{
-			common.ComponentProxy: {Type: common.ProxyTypeHAProxy, Replicas: ptr32(1)},
-		})
-		if err := applyProxy(cr, inst, spec); err != nil {
-			t.Fatal(err)
-		}
-		if cr.Spec.Unsafe.ProxySize {
-			t.Fatal("haproxy has no minimum size in the operator; unsafeFlags.proxySize must stay false")
-		}
-	})
-
 	t.Run("haproxy configuration is passed through verbatim", func(t *testing.T) {
 		t.Parallel()
 		cr := &psv1.PerconaServerMySQL{}

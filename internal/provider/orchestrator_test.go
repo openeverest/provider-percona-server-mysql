@@ -194,36 +194,6 @@ func TestApplyOrchestrator(t *testing.T) {
 		}
 	})
 
-	t.Run("undersized or even size sets unsafeFlags.orchestratorSize", func(t *testing.T) {
-		t.Parallel()
-		for _, size := range []int32{1, 2, 4} {
-			cr := &psv1.PerconaServerMySQL{}
-			inst := instanceWithTopology(common.TopologyAsync, map[string]corev1alpha1.ComponentSpec{
-				common.ComponentOrchestrator: {Replicas: ptr32(size)},
-			})
-			if err := applyOrchestrator(cr, inst, spec); err != nil {
-				t.Fatal(err)
-			}
-			if !cr.Spec.Unsafe.OrchestratorSize {
-				t.Fatalf("size %d: expected unsafeFlags.orchestratorSize to be set", size)
-			}
-		}
-	})
-
-	t.Run("safe odd size clears unsafeFlags.orchestratorSize", func(t *testing.T) {
-		t.Parallel()
-		cr := &psv1.PerconaServerMySQL{}
-		inst := instanceWithTopology(common.TopologyAsync, map[string]corev1alpha1.ComponentSpec{
-			common.ComponentOrchestrator: {Replicas: ptr32(5)},
-		})
-		if err := applyOrchestrator(cr, inst, spec); err != nil {
-			t.Fatal(err)
-		}
-		if cr.Spec.Unsafe.OrchestratorSize {
-			t.Fatal("expected unsafeFlags.orchestratorSize to be cleared for a safe size")
-		}
-	})
-
 	t.Run("group-replication ignores orchestrator component", func(t *testing.T) {
 		t.Parallel()
 		cr := &psv1.PerconaServerMySQL{}
@@ -283,27 +253,4 @@ func instanceWithTopology(topology string, components map[string]corev1alpha1.Co
 
 func ptr32(v int32) *int32 {
 	return &v
-}
-
-func TestAsyncFailoverRequiresUnsafe(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name     string
-		topology string
-		backup   *psv1.BackupSpec
-		want     bool
-	}{
-		{name: "async without backups", topology: common.TopologyAsync, want: true},
-		{name: "async with backups disabled", topology: common.TopologyAsync, backup: &psv1.BackupSpec{Enabled: false}, want: true},
-		{name: "async with backups", topology: common.TopologyAsync, backup: &psv1.BackupSpec{Enabled: true}},
-		{name: "group-replication without backups", topology: common.TopologyGroupReplication},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			cr := &psv1.PerconaServerMySQL{Spec: psv1.PerconaServerMySQLSpec{Backup: tt.backup}}
-			assert.Equal(t, tt.want, asyncFailoverRequiresUnsafe(tt.topology, cr))
-		})
-	}
 }

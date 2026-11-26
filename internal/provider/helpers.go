@@ -18,55 +18,21 @@ func effectiveTopologyType(inst *corev1alpha1.Instance) string {
 	return common.TopologyGroupReplication
 }
 
-// Safe sizes the operator's CRD validation enforces unless the matching
-// unsafeFlags field is set. The operator dropped its Go constants for these
-// in 1.3.0, so they mirror the x-kubernetes-validations rules of the
-// PerconaServerMySQL CRD.
-const (
-	minSafeAsyncSize        = 2
-	minSafeGRSize           = 3
-	maxSafeGRSize           = 9
-	minSafeRouterSize       = 2
-	minSafeOrchestratorSize = 3
-)
-
-func mysqlSizeRequiresUnsafe(topology string, size int32) bool {
-	switch topology {
-	case common.TopologyAsync:
-		return size < minSafeAsyncSize
-	case common.TopologyGroupReplication:
-		return size < minSafeGRSize || size >= maxSafeGRSize || size%2 == 0
-	default:
-		return false
-	}
-}
-
-// orchestratorSizeRequiresUnsafe reports whether an enabled orchestrator's
-// size falls outside the operator's safe range for async replication: the
-// operator requires the size to be odd and >= 3 unless
-// unsafeFlags.orchestratorSize is set.
-func orchestratorSizeRequiresUnsafe(size int32) bool {
-	return size < minSafeOrchestratorSize || size%2 == 0
-}
-
-// proxySizeRequiresUnsafe reports whether an enabled MySQL Router's size
-// falls below the operator's safe minimum for group-replication unless
-// unsafeFlags.proxySize is set. HAProxy has no equivalent minimum in the
-// operator, so it always returns false.
-func proxySizeRequiresUnsafe(proxyType string, size int32) bool {
-	if proxyType != common.ProxyTypeRouter {
-		return false
-	}
-	return size < minSafeRouterSize
-}
-
-// asyncFailoverRequiresUnsafe reports whether an async cluster runs without
-// backups. Since 1.3.0 the operator recovers the transactions stranded on a
-// failed primary from the backup sidecar, and accepts an async cluster
-// without backups only with unsafeFlags.asyncFailoverWithPossibleDataLoss:
-// Orchestrator then promotes a replica on its own, as before 1.3.0.
-func asyncFailoverRequiresUnsafe(topology string, cr *psv1.PerconaServerMySQL) bool {
-	return topology == common.TopologyAsync && !cr.BackupEnabled()
+// allowAnyLayout turns off the operator's opinions on what a production
+// cluster looks like, so any layout the Instance asks for is accepted, such
+// as a single node with a single proxy for development. These flags only
+// relax the operator's CRD validation: MySQL size (async >= 2,
+// group-replication odd and 3..8), Router size >= 2, Orchestrator size odd
+// and >= 3, and async without backups, where a failover cannot recover the
+// transactions stranded on the old primary.
+//
+// unsafeFlags.proxy and unsafeFlags.orchestrator are set by applyProxy and
+// applyOrchestrator instead: the operator reads them to decide what to run.
+func allowAnyLayout(cr *psv1.PerconaServerMySQL) {
+	cr.Spec.Unsafe.MySQLSize = true
+	cr.Spec.Unsafe.ProxySize = true
+	cr.Spec.Unsafe.OrchestratorSize = true
+	cr.Spec.Unsafe.AsyncFailoverWithPossibleDataLoss = true
 }
 
 func imageForComponentType(spec *corev1alpha1.ProviderSpec, componentType, version, override string) string {
