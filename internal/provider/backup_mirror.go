@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -18,9 +19,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openeverest/provider-percona-server-mysql/definition/backupclasses"
+	"github.com/openeverest/provider-percona-server-mysql/definition/backupclasses/ps"
 	"github.com/openeverest/provider-percona-server-mysql/internal/common"
 )
 
@@ -107,8 +110,28 @@ func (p *Provider) Mirror(ctx context.Context, c client.Client, obj client.Objec
 			ClassRef:     apicommon.ObjectRef{Name: instance.Spec.Backup.ClassRef.Name},
 			StorageRef:   apicommon.ObjectRef{Name: opBackup.Spec.StorageName},
 			ScheduleName: scheduleName,
+			Parameters:   backupTypeParameters(opBackup.Spec.Type),
 		},
 	}, nil
+}
+
+// backupTypeParameters encodes the operator-resolved xtrabackup backup type
+// (PerconaServerMySQLBackup.Spec.Type, set by the operator's cron scheduler
+// from the matching InstanceBackupSchedule's parameters — see
+// applyBackupSettings/resolveBackupType) as the Backup CR's spec.parameters,
+// using the same schema (ps.PsBackupParameters) SyncBackup/resolveBackupType
+// use for on-demand backups. This lets `kubectl get backup -o yaml` surface
+// "incremental" for scheduled backups too, rather than leaving
+// spec.parameters empty as it would be for a mirrored CR by default.
+func backupTypeParameters(backupType psv1.BackupType) *runtime.RawExtension {
+	if backupType == "" {
+		return nil
+	}
+	raw, err := json.Marshal(ps.PsBackupParameters{Type: ps.PsBackupType(backupType)})
+	if err != nil {
+		return nil
+	}
+	return &runtime.RawExtension{Raw: raw}
 }
 
 // scheduledBackupName determines whether opBackup was produced by the
