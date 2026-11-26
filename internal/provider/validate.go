@@ -15,6 +15,7 @@ func (p *Provider) Validate(in controller.ValidationInput) controller.Validation
 	errs = append(errs, validateProxy(in.Instance)...)
 	errs = append(errs, validateTLS(in.Instance)...)
 	errs = append(errs, validateTLSTransition(in.Instance, in.Old)...)
+	errs = append(errs, validateBackupSchedules(in.Instance.Spec.Backup)...)
 	return controller.ValidationResult{Errors: errs}
 }
 

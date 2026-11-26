@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	apicommon "github.com/openeverest/openeverest/v2/api/common/v1alpha1"
 	corev1alpha1 "github.com/openeverest/openeverest/v2/api/core/v1alpha1"
 	"github.com/openeverest/openeverest/v2/provider-runtime/controller/validationtest"
 
@@ -30,6 +31,24 @@ func component(name string, mutate func(*corev1alpha1.ComponentSpec)) func(*core
 // proxyType sets the proxy component's type.
 func proxyType(t string) func(*corev1alpha1.Instance) {
 	return component(common.ComponentProxy, func(c *corev1alpha1.ComponentSpec) { c.Type = t })
+}
+
+// schedules gives the Instance one backup storage with the given schedules,
+// all enabled.
+func schedules(list ...corev1alpha1.InstanceBackupSchedule) func(*corev1alpha1.Instance) {
+	return func(in *corev1alpha1.Instance) {
+		for i := range list {
+			list[i].Enabled = true
+		}
+		in.Spec.Backup = &corev1alpha1.InstanceBackupSpec{
+			Enabled:  true,
+			ClassRef: apicommon.ObjectRef{Name: "ps"},
+			Storages: []corev1alpha1.InstanceBackupStorage{{
+				StorageRef: apicommon.ObjectRef{Name: "minio"},
+				Schedules:  list,
+			}},
+		}
+	}
 }
 
 // TestValidate runs the checks the runtime runs before every Sync: the
@@ -130,6 +149,44 @@ func TestValidate(t *testing.T) {
 				c.Replicas = new(int32(0))
 			}),
 			want: []string{"spec.components[orchestrator].replicas"},
+		},
+		{
+			name:    "schedule name is an arbitrary user-facing identifier",
+			fixture: asyncFixture,
+			mutate:  schedules(corev1alpha1.InstanceBackupSchedule{Name: "nightly-full", Cron: "0 1 * * *"}),
+		},
+		{
+			name:    "two schedules of the same inferred type on a storage are allowed",
+			fixture: asyncFixture,
+			mutate: schedules(
+				corev1alpha1.InstanceBackupSchedule{Name: "weekly-full", Cron: "0 1 * * 0"},
+				corev1alpha1.InstanceBackupSchedule{Name: "monthly-full", Cron: "0 1 1 * *"},
+			),
+		},
+		{
+			name:    "duplicate schedule name",
+			fixture: asyncFixture,
+			mutate: schedules(
+				corev1alpha1.InstanceBackupSchedule{Name: "nightly", Cron: "0 1 * * *"},
+				corev1alpha1.InstanceBackupSchedule{Name: "nightly", Cron: "0 2 * * *", Parameters: raw(`{"type":"incremental"}`)},
+			),
+			want: []string{"spec.backup.storages[0].schedules[1].name"},
+		},
+		{
+			name:    "schedule parameters with an unknown type",
+			fixture: asyncFixture,
+			mutate: schedules(corev1alpha1.InstanceBackupSchedule{
+				Name: "nightly", Cron: "0 1 * * *", Parameters: raw(`{"type":"weekly"}`),
+			}),
+			want: []string{"spec.backup.storages[0].schedules[0].parameters"},
+		},
+		{
+			name:    "schedule parameters with an undeclared field",
+			fixture: asyncFixture,
+			mutate: schedules(corev1alpha1.InstanceBackupSchedule{
+				Name: "nightly", Cron: "0 1 * * *", Parameters: raw(`{"compress":true}`),
+			}),
+			want: []string{"spec.backup.storages[0].schedules[0].parameters"},
 		},
 	}
 

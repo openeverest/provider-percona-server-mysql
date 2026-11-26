@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	backupv1alpha1 "github.com/openeverest/openeverest/v2/api/backup/v1alpha1"
@@ -238,6 +237,14 @@ func (p *Provider) SyncRestore(c *controller.Context, restore *backupv1alpha1.Re
 		Group: psv1.GroupVersion.Group,
 		Kind:  "PerconaServerMySQLRestore",
 		Name:  restore.Name,
+	}
+
+	if err := validateRestoreParameters(restore.Spec.Parameters); err != nil {
+		return controller.RestoreExecutionStatus{
+			State:              backupv1alpha1.RestoreStateFailed,
+			Message:            fmt.Sprintf("spec.parameters: %v", err),
+			OperatorRestoreRef: opRef,
+		}, nil
 	}
 
 	backupName, pending, err := resolveRestoreSource(c, restore, opRef)
@@ -548,29 +555,20 @@ func immutableBackupSpecChangeMessage(opBackup *psv1.PerconaServerMySQLBackup, b
 	return ""
 }
 
-// psBackupTypeParameters is the subset of definition/backupclasses/ps.
-// PsBackupParameters (and, for schedules, the identically-shaped per-storage
-// schedule parameters) that resolveBackupType needs to decode.
-type psBackupTypeParameters struct {
-	Type psv1.BackupType `json:"type,omitempty"`
-}
-
 // resolveBackupType extracts the xtrabackup backup type from a Backup's
 // spec.parameters or an InstanceBackupSchedule's spec.parameters — both are
-// validated against the same BackupClass parametersSchema (PsBackupParameters).
+// decoded strictly against the ps BackupClass's parametersSchema
+// (PsBackupParameters) and must name a known type.
 func resolveBackupType(raw *runtime.RawExtension) (psv1.BackupType, error) {
-	if raw == nil || len(raw.Raw) == 0 {
-		return defaultBackupType, nil
+	cfg, err := parseBackupParameters(raw)
+	if err != nil {
+		return "", err
 	}
-	var cfg psBackupTypeParameters
-	if err := json.Unmarshal(raw.Raw, &cfg); err != nil {
-		return "", fmt.Errorf("decode backup parameters: %w", err)
-	}
-	switch cfg.Type {
+	switch string(cfg.Type) {
 	case "":
 		return defaultBackupType, nil
-	case psv1.BackupTypeFull, psv1.BackupTypeIncremental:
-		return cfg.Type, nil
+	case string(psv1.BackupTypeFull), string(psv1.BackupTypeIncremental):
+		return psv1.BackupType(cfg.Type), nil
 	default:
 		return "", fmt.Errorf("unsupported backup type %q; must be %q or %q", cfg.Type, psv1.BackupTypeFull, psv1.BackupTypeIncremental)
 	}
