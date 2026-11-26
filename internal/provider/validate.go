@@ -15,11 +15,22 @@ func (p *Provider) Validate(in controller.ValidationInput) controller.Validation
 	errs = append(errs, validateProxy(in.Instance)...)
 	errs = append(errs, validateTLS(in.Instance)...)
 	errs = append(errs, validateTLSTransition(in.Instance, in.Old)...)
+	errs = append(errs, validateBackupScheduleNames(in.Instance.Spec.Backup)...)
 	return controller.ValidationResult{Errors: errs}
 }
 
 // ValidateReferences checks the rules that read other objects: the TLS
-// certificate Secret and the running PerconaServerMySQL.
+// certificate Secret, the running PerconaServerMySQL, and each backup
+// schedule's Parameters against the resolved BackupClass's parametersSchema
+// (a class-dependent check Validate cannot make, since it gets no Context).
 func (p *Provider) ValidateReferences(c *controller.Context) (field.ErrorList, error) {
-	return validateTLSReferences(c)
+	errs, err := validateTLSReferences(c)
+	if err != nil {
+		return nil, err
+	}
+	scheduleErrs, err := validateBackupScheduleParameters(c)
+	if err != nil {
+		return nil, err
+	}
+	return append(errs, scheduleErrs...), nil
 }
