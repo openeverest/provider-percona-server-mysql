@@ -224,7 +224,7 @@ func applyBackupSettings(c *controller.Context, cluster *psv1.PerconaServerMySQL
 			if !schedule.Enabled {
 				continue
 			}
-			backupType, err := resolveBackupType(schedule.Parameters)
+			backupType, err := resolveBackupType(backupClass, schedule.Parameters)
 			if err != nil {
 				return &controller.BackupConfigError{Reason: "InvalidBackupParameters", Message: fmt.Sprintf("storage %q schedule %q: %v", storage.StorageRef.Name, schedule.Name, err)}
 			}

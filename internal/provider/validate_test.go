@@ -172,22 +172,12 @@ func TestValidate(t *testing.T) {
 			),
 			want: []string{"spec.backup.storages[0].schedules[1].name"},
 		},
-		{
-			name:    "schedule parameters with an unknown type",
-			fixture: asyncFixture,
-			mutate: schedules(corev1alpha1.InstanceBackupSchedule{
-				Name: "nightly", Cron: "0 1 * * *", Parameters: raw(`{"type":"weekly"}`),
-			}),
-			want: []string{"spec.backup.storages[0].schedules[0].parameters"},
-		},
-		{
-			name:    "schedule parameters with an undeclared field",
-			fixture: asyncFixture,
-			mutate: schedules(corev1alpha1.InstanceBackupSchedule{
-				Name: "nightly", Cron: "0 1 * * *", Parameters: raw(`{"compress":true}`),
-			}),
-			want: []string{"spec.backup.storages[0].schedules[0].parameters"},
-		},
+		// Whether a schedule's Parameters conform to the resolved
+		// BackupClass's parametersSchema is checked by
+		// validateBackupScheduleParameters, which needs a live BackupClass
+		// read and so runs from ValidateReferences — see
+		// TestValidateBackupScheduleParameters in backup_params_test.go, not
+		// this admission-only (Context-less) harness.
 	}
 
 	for _, tt := range tests {

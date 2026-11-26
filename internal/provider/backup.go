@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	backupv1alpha1 "github.com/openeverest/openeverest/v2/api/backup/v1alpha1"
@@ -18,6 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/openeverest/provider-percona-server-mysql/definition/backupclasses/ps"
 )
 
 // instanceNameLabelKey is stamped on Backup/Restore CRs so they can be listed
@@ -61,6 +64,19 @@ func (p *Provider) SyncBackup(c *controller.Context, backup *backupv1alpha1.Back
 		Kind:  "PerconaServerMySQLBackup",
 		Name:  backup.Name,
 	}
+
+	backupClass, err := c.BackupClassForInstance()
+	if err != nil {
+		return controller.BackupExecutionStatus{}, fmt.Errorf("get backup class for instance %q: %w", backup.Spec.Origin.InstanceRef.Name, err)
+	}
+	if err := validateBackupParameters(backupClass, backup.Spec.Parameters); err != nil {
+		return controller.BackupExecutionStatus{
+			State:             backupv1alpha1.BackupStateFailed,
+			Message:           fmt.Sprintf("spec.parameters: %v", err),
+			OperatorBackupRef: opRef,
+		}, nil
+	}
+
 	managedByRuntime := backup.Spec.ScheduleName == ""
 	ensureBackupControllerReference := func(opBackup *psv1.PerconaServerMySQLBackup) error {
 		if err := controllerutil.SetControllerReference(backup, opBackup, c.Client().Scheme()); err != nil {
@@ -70,7 +86,7 @@ func (p *Provider) SyncBackup(c *controller.Context, backup *backupv1alpha1.Back
 	}
 
 	opBackup := &psv1.PerconaServerMySQLBackup{}
-	err := c.Client().Get(c.Context(), client.ObjectKey{Namespace: backup.Namespace, Name: backup.Name}, opBackup)
+	err = c.Client().Get(c.Context(), client.ObjectKey{Namespace: backup.Namespace, Name: backup.Name}, opBackup)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return controller.BackupExecutionStatus{}, fmt.Errorf("get PerconaServerMySQLBackup %q: %w", backup.Name, err)
@@ -113,7 +129,7 @@ func (p *Provider) SyncBackup(c *controller.Context, backup *backupv1alpha1.Back
 			}, nil
 		}
 
-		backupType, err := resolveBackupType(backup.Spec.Parameters)
+		backupType, err := resolveBackupType(backupClass, backup.Spec.Parameters)
 		if err != nil {
 			return controller.BackupExecutionStatus{
 				State:             backupv1alpha1.BackupStateFailed,
@@ -239,7 +255,11 @@ func (p *Provider) SyncRestore(c *controller.Context, restore *backupv1alpha1.Re
 		Name:  restore.Name,
 	}
 
-	if err := validateRestoreParameters(restore.Spec.Parameters); err != nil {
+	restoreClass, err := c.BackupClassForInstance()
+	if err != nil {
+		return controller.RestoreExecutionStatus{}, fmt.Errorf("get backup class for instance %q: %w", restore.Spec.InstanceRef.Name, err)
+	}
+	if err := validateRestoreParameters(restoreClass, restore.Spec.Parameters); err != nil {
 		return controller.RestoreExecutionStatus{
 			State:              backupv1alpha1.RestoreStateFailed,
 			Message:            fmt.Sprintf("spec.parameters: %v", err),
@@ -556,20 +576,24 @@ func immutableBackupSpecChangeMessage(opBackup *psv1.PerconaServerMySQLBackup, b
 }
 
 // resolveBackupType extracts the xtrabackup backup type from a Backup's
-// spec.parameters or an InstanceBackupSchedule's spec.parameters — both are
-// decoded strictly against the ps BackupClass's parametersSchema
-// (PsBackupParameters) and must name a known type.
-func resolveBackupType(raw *runtime.RawExtension) (psv1.BackupType, error) {
-	cfg, err := parseBackupParameters(raw)
-	if err != nil {
+// spec.parameters or an InstanceBackupSchedule's spec.parameters. The
+// payload is checked against bc's parametersSchema first — the set of
+// accepted type values comes from the +kubebuilder:validation:Enum marker on
+// ps.PsBackupType, not a hand-written list, so there is nothing left to
+// validate here beyond extracting the field.
+func resolveBackupType(bc *backupv1alpha1.BackupClass, raw *runtime.RawExtension) (psv1.BackupType, error) {
+	if err := validateBackupParameters(bc, raw); err != nil {
 		return "", err
 	}
-	switch string(cfg.Type) {
-	case "":
+	if raw == nil || len(raw.Raw) == 0 {
 		return defaultBackupType, nil
-	case string(psv1.BackupTypeFull), string(psv1.BackupTypeIncremental):
-		return psv1.BackupType(cfg.Type), nil
-	default:
-		return "", fmt.Errorf("unsupported backup type %q; must be %q or %q", cfg.Type, psv1.BackupTypeFull, psv1.BackupTypeIncremental)
 	}
+	var cfg ps.PsBackupParameters
+	if err := json.Unmarshal(raw.Raw, &cfg); err != nil {
+		return "", fmt.Errorf("decode backup parameters: %w", err)
+	}
+	if cfg.Type == "" {
+		return defaultBackupType, nil
+	}
+	return psv1.BackupType(cfg.Type), nil
 }
