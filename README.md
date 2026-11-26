@@ -80,7 +80,7 @@ provider itself is covered under [Installation](#installation).
 | Custom configuration | ✅ | `spec.components.engine.parameters.configuration` — see [Custom MySQL configuration](#custom-mysql-configuration) |
 | Exposure | ✅ | `spec.components.<name>.service.serviceType`: `ClusterIP` (default), `LoadBalancer` or `NodePort`, for `engine` and `proxy` independently — both are exposed in the UI. `proxy.service` controls how clients reach HAProxy/Router and is how most clients should connect; `engine.service` exposes the MySQL primary and per-pod Services directly, bypassing the proxy, for clients that need a direct connection. `service.annotations` and, for `LoadBalancer`, `service.loadBalancerService.sourceRanges` are also supported on both, but only via the `Instance` spec directly — the UI doesn't expose them yet ([openeverest#1959](https://github.com/openeverest/openeverest/issues/1959), [openeverest#2398](https://github.com/openeverest/openeverest/issues/2398)) |
 | Monitoring | ✅ | PMM, via the optional `monitoring` component |
-| TLS | ✅ | Always on (the operator's default); bring your own certificate secret or a cert-manager issuer — see [TLS](#tls) |
+| TLS | ✅ | Always on (the operator's default); `preferTLS` or `requireTLS`; bring your own certificate secret or CA (cert-manager issuer), extra DNS names — see [TLS](#tls) |
 
 Stateful workloads additionally report:
 
@@ -249,36 +249,102 @@ See [examples/instance-custom-config.yaml](examples/instance-custom-config.yaml)
 ## TLS
 
 The PS operator always encrypts connections between members and clients with TLS; it
-cannot be disabled. `spec.parameters.tls` only configures where the certificate comes
-from — it does not turn encryption on or off.
-
-By default the operator manages the certificate itself (via cert-manager when it is
-installed in the cluster, or else a self-signed CA it creates for the instance). You can
-instead bring your own certificate, or have the operator request one from a cert-manager
-`Issuer`/`ClusterIssuer`:
+cannot be disabled. Configure it with the instance-wide `tls` parameter:
 
 ```yaml
 spec:
   parameters:
     tls:
-      # Bring your own certificate secret (tls.crt, tls.key and ca.crt), OR:
-      certificateSecretName: my-certs
-      # have a cert-manager issuer sign it (not both):
-      # issuer:
-      #   name: my-issuer
-      #   kind: Issuer # or ClusterIssuer
+      mode: requireTLS                 # preferTLS (default) | requireTLS
+      # Pick one certificate source, or neither to have a certificate issued:
+      certificateSecretName: my-certs  # tls.crt, tls.key and ca.crt
+      issuer:                          # cert-manager
+        name: company-ca
+        kind: Issuer                   # Issuer (default) | ClusterIssuer
+        group: cert-manager.io         # the only group supported
+      additionalNames:                 # DNS names clients use, besides the in-cluster ones
+        - mydb.company.com
 ```
 
-The certificate secret, when supplied, must contain `tls.crt`, `tls.key` and `ca.crt`,
-and its subject alternative names must cover the instance's service and pod names (see
-the operator's [TLS documentation](https://docs.percona.com/percona-operator-for-mysql/ps/tls.html)).
+- **`preferTLS`** lets clients choose whether to use TLS; **`requireTLS`** additionally sets
+  `require_secure_transport=ON` in the engine's configuration, rejecting clients that don't use
+  TLS (a `require_secure_transport` you set in the
+  [custom configuration](#custom-mysql-configuration) wins). The provider's own metrics
+  exporters then connect with TLS too. Switching the mode on a running instance restarts its
+  pods.
+- **Certificate**, in order of precedence:
+  1. your secret, `certificateSecretName`, with `tls.crt`, `tls.key` and `ca.crt`. Its subject
+     alternative names must cover the instance's service and pod names (see the operator's
+     [TLS documentation](https://docs.percona.com/percona-operator-for-mysql/ps/tls.html)).
+     The operator never replaces a secret it did not create;
+  2. a cert-manager `issuer` — requires cert-manager installed in the cluster. External
+     issuers (another `group`, such as AWS Private CA) are rejected until the operator supports
+     them ([K8SPS-989](https://perconadev.atlassian.net/browse/K8SPS-989)). `ClusterIssuer`
+     needs PS operator 1.3.0 or later
+     ([K8SPS-649](https://perconadev.atlassian.net/browse/K8SPS-649)): 1.2.0 only looks up a
+     namespaced `Issuer` of that name;
+  3. otherwise the operator issues it: through cert-manager with a CA of its own when
+     cert-manager is installed, or else from a self-signed CA it creates for the instance.
 
-The certificate source (`certificateSecretName` or `issuer`) can only be set when the
-instance is created: a new CA later would not be trusted by members or clients already
-holding the old one.
+  The certificate source can only be set when the instance is created: a new CA later would
+  not be trusted by members or clients already holding the old one.
+- **`additionalNames`** adds DNS names (no IP addresses; wildcards are fine) to the issued or
+  generated certificate, for clients that reach the instance under another name, such as an
+  exposed proxy behind `mydb.company.com`. It can't be combined with `certificateSecretName`,
+  whose certificate carries its own names. Changing it on a running instance reissues the
+  certificate from the same issuer and restarts the pods, so it holds for a
+  `tls-names-<hash>` maintenance approval (a rolling restart; see
+  `status.pendingMaintenance`). That needs a certificate issued by cert-manager: on an instance
+  whose certificate comes from the CA the operator generated without it, the names can only be
+  set at creation.
+- **Clients** need only the CA to verify the instance: the connection secret
+  (`<instance>-conn`) carries it as `ca.crt` once it has been issued.
 
-The connection secret for the instance carries the CA certificate as `ca.crt` once it has
-been issued, so clients can verify the instance's certificate.
+### Bring your own CA
+
+To have clients connect to `mydb.company.com` with full verification against your company CA,
+give cert-manager the CA and let it sign the instance's certificate:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: company-ca
+  namespace: default               # the instance namespace
+type: kubernetes.io/tls
+data:
+  tls.crt: <base64 CA certificate>
+  tls.key: <base64 CA key>
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: company-ca
+  namespace: default
+spec:
+  ca:
+    secretName: company-ca
+---
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: mydb
+  namespace: default
+spec:
+  # ...
+  parameters:
+    tls:
+      mode: requireTLS
+      issuer:
+        name: company-ca
+      additionalNames:
+        - mydb.company.com
+```
+
+Point `mydb.company.com` at the address clients reach the instance on (for example the proxy's
+exposed load balancer). Clients then verify the server against `ca.crt` from `mydb-conn`, for
+instance `mysql --ssl-mode=VERIFY_IDENTITY --ssl-ca=ca.crt -h mydb.company.com …`. See
+[examples/instance-tls.yaml](examples/instance-tls.yaml).
 
 ## Development
 

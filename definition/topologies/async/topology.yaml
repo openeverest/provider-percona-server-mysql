@@ -246,8 +246,22 @@ ui:
             - proxyConfiguration
         tls:
           label: "TLS"
-          description: "Encrypt connections to your database and between its members. The operator always encrypts these connections; this only configures where the certificate comes from."
+          description: "Encrypt connections to your database and between its members. The operator always encrypts these connections."
           components:
+            mode:
+              uiType: select
+              path: spec.parameters.tls.mode
+              fieldParams:
+                label: "TLS mode"
+                helperText: "Changing it on a running instance restarts its pods"
+                defaultValue: "preferTLS"
+                options:
+                  - label: "Preferred: clients choose whether to use TLS"
+                    value: "preferTLS"
+                  - label: "Required: clients must use TLS"
+                    value: "requireTLS"
+              validation:
+                required: true
             certificates:
               uiType: group
               groupType: bordered
@@ -276,7 +290,7 @@ ui:
                       path: spec.parameters.tls.issuer.name
                       fieldParams:
                         label: "cert-manager issuer"
-                        helperText: "Issuer that signs the certificate"
+                        helperText: "Issuer that signs the certificate. Additional DNS names (spec.parameters.tls.additionalNames) are set in YAML"
                         modes:
                           edit:
                             disabled: true
@@ -301,6 +315,7 @@ ui:
                 - certificateSecretName
                 - issuer
           componentsOrder:
+            - mode
             - certificates
         advanced:
           label: Advanced Configuration

@@ -191,7 +191,7 @@ func renderPMM(c *controller.Context, cluster *psv1.PerconaServerMySQL, rb contr
 		// The operator only has one pmm-admin params field, applied to the
 		// MySQL agent; there is no equivalent for HAProxy in this operator
 		// version.
-		MySQLParams: pmmAdminParams(c, common.ComponentEngine),
+		MySQLParams: pmmMySQLParams(c, cluster),
 	}, token, nil
 }
 

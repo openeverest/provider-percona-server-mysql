@@ -1,0 +1,25 @@
+# The new names wait for approval: the certificate and cluster keep the old ones.
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: ps-issuer
+status:
+  (length(pendingMaintenance[?starts_with(approvalToken, 'tls-names-')])): 1
+  (pendingMaintenance[?starts_with(approvalToken, 'tls-names-')] | [0].severity): RollingRestart
+---
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: ps-issuer
+spec:
+  tls:
+    SANs:
+      - db.example.com
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ps-issuer-ssl
+spec:
+  (contains(dnsNames, 'db.example.com')): true
+  (contains(dnsNames, 'db2.example.com')): false

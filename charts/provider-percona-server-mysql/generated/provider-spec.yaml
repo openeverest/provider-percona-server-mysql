@@ -117,10 +117,22 @@ spec:
       properties:
         tls:
           description: |-
-            TLS configures the certificates used to encrypt connections to the
+            TLS configures encryption in transit, between clients and the
             instance and between its members. The PS operator always encrypts
             these connections; TLS cannot be disabled.
           properties:
+            additionalNames:
+              description: |-
+                AdditionalNames are DNS names clients use to reach the instance, such
+                as mydb.company.com, added to the in-cluster names of the generated
+                or issued certificate. Not with certificateSecretName: that
+                certificate carries its own names. Changing them on a running
+                instance reissues the certificate and restarts its pods, so it waits
+                for maintenance approval, and needs a certificate issued by
+                cert-manager.
+              items:
+                type: string
+              type: array
             certificateSecretName:
               description: |-
                 CertificateSecretName names a Secret in the instance namespace with
@@ -133,6 +145,13 @@ spec:
                 Issuer is the cert-manager issuer that signs the instance's
                 certificate, instead of a self-signed CA created for the instance.
               properties:
+                group:
+                  default: cert-manager.io
+                  description: |-
+                    Group is the API group of the issuer. Only cert-manager.io is
+                    supported: the PS operator can't use external issuers yet
+                    (https://perconadev.atlassian.net/browse/K8SPS-989).
+                  type: string
                 kind:
                   default: Issuer
                   description: Kind of the issuer.
@@ -141,6 +160,12 @@ spec:
                   description: Name of the issuer.
                   type: string
               type: object
+            mode:
+              default: preferTLS
+              description: |-
+                Mode controls whether client connections require TLS. Changing it on a
+                running instance restarts its pods.
+              type: string
           type: object
       type: object
   release:
@@ -465,7 +490,7 @@ spec:
                       uiType: select
                     issuerName:
                       fieldParams:
-                        helperText: Issuer that signs the certificate
+                        helperText: Issuer that signs the certificate. Additional DNS names (spec.parameters.tls.additionalNames) are set in YAML
                         label: cert-manager issuer
                         modes:
                           edit:
@@ -484,9 +509,24 @@ spec:
               groupType: bordered
               label: Certificates
               uiType: group
+            mode:
+              fieldParams:
+                defaultValue: preferTLS
+                helperText: Changing it on a running instance restarts its pods
+                label: TLS mode
+                options:
+                  - label: 'Preferred: clients choose whether to use TLS'
+                    value: preferTLS
+                  - label: 'Required: clients must use TLS'
+                    value: requireTLS
+              path: spec.parameters.tls.mode
+              uiType: select
+              validation:
+                required: true
           componentsOrder:
+            - mode
             - certificates
-          description: Encrypt connections to your database and between its members. The operator always encrypts these connections; this only configures where the certificate comes from.
+          description: Encrypt connections to your database and between its members. The operator always encrypts these connections.
           label: TLS
       sectionsOrder:
         - databaseVersion
@@ -776,7 +816,7 @@ spec:
                       uiType: select
                     issuerName:
                       fieldParams:
-                        helperText: Issuer that signs the certificate
+                        helperText: Issuer that signs the certificate. Additional DNS names (spec.parameters.tls.additionalNames) are set in YAML
                         label: cert-manager issuer
                         modes:
                           edit:
@@ -795,9 +835,24 @@ spec:
               groupType: bordered
               label: Certificates
               uiType: group
+            mode:
+              fieldParams:
+                defaultValue: preferTLS
+                helperText: Changing it on a running instance restarts its pods
+                label: TLS mode
+                options:
+                  - label: 'Preferred: clients choose whether to use TLS'
+                    value: preferTLS
+                  - label: 'Required: clients must use TLS'
+                    value: requireTLS
+              path: spec.parameters.tls.mode
+              uiType: select
+              validation:
+                required: true
           componentsOrder:
+            - mode
             - certificates
-          description: Encrypt connections to your database and between its members. The operator always encrypts these connections; this only configures where the certificate comes from.
+          description: Encrypt connections to your database and between its members. The operator always encrypts these connections.
           label: TLS
       sectionsOrder:
         - databaseVersion

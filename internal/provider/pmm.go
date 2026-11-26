@@ -10,10 +10,13 @@ import (
 
 	pmm "github.com/openeverest/monitoring-pmm/api"
 	"github.com/openeverest/openeverest/v2/provider-runtime/controller"
+	psv1 "github.com/percona/percona-server-mysql-operator/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openeverest/provider-percona-server-mysql/internal/common"
 )
 
 const (
@@ -111,6 +114,17 @@ func pmmAdminParams(c *controller.Context, component string) string {
 		labels = append(labels, prometheusLabelName(controller.ComponentLabel)+"="+component)
 	}
 	return "--custom-labels=" + strings.Join(labels, ",")
+}
+
+// pmmMySQLParams are the pmm-admin flags for the MySQL agent. When the
+// engine requires TLS, the agent connects with TLS too, without verifying the
+// certificate: it only connects to its own pod.
+func pmmMySQLParams(c *controller.Context, cluster *psv1.PerconaServerMySQL) string {
+	params := pmmAdminParams(c, common.ComponentEngine)
+	if requiresSecureTransport(cluster) {
+		params += " --tls --tls-skip-verify"
+	}
+	return params
 }
 
 var invalidPrometheusLabelChars = regexp.MustCompile(`[^a-zA-Z0-9_]`)

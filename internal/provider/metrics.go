@@ -35,19 +35,26 @@ func applyMetricsExporter(cluster, live *psv1.PerconaServerMySQL, required contr
 		return fmt.Errorf("cannot resolve image for component type %q", common.ComponentTypeMySQLDExporter)
 	}
 
-	cluster.Spec.MySQL.Sidecars = append(cluster.Spec.MySQL.Sidecars, mysqldExporterContainer(image, cluster.Spec.SecretsName))
+	cluster.Spec.MySQL.Sidecars = append(cluster.Spec.MySQL.Sidecars, mysqldExporterContainer(image, cluster.Spec.SecretsName, requiresSecureTransport(cluster)))
 	return nil
 }
 
-func mysqldExporterContainer(image, usersSecretName string) corev1.Container {
+// mysqldExporterContainer is the exporter sidecar. When the engine requires
+// TLS, it connects with TLS too, without verifying the certificate: it only
+// connects over the loopback interface.
+func mysqldExporterContainer(image, usersSecretName string, requireTLS bool) corev1.Container {
+	args := []string{
+		"--mysqld.address=127.0.0.1:3306",
+		"--mysqld.username=" + monitorUser,
+	}
+	if requireTLS {
+		args = append(args, "--tls.insecure-skip-verify")
+	}
 	return corev1.Container{
 		Name:            mysqldExporterContainerName,
 		Image:           image,
 		ImagePullPolicy: corev1.PullIfNotPresent,
-		Args: []string{
-			"--mysqld.address=127.0.0.1:3306",
-			"--mysqld.username=" + monitorUser,
-		},
+		Args:            args,
 		Env: []corev1.EnvVar{{
 			Name: "MYSQLD_EXPORTER_PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{

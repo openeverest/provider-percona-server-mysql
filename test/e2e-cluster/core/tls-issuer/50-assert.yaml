@@ -1,0 +1,24 @@
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: ps-issuer
+spec:
+  tls:
+    SANs:
+      - db2.example.com
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ps-issuer-ssl
+spec:
+  (contains(dnsNames, 'db2.example.com')): true
+  (contains(dnsNames, 'db.example.com')): false
+  (contains(dnsNames, 'ps-issuer-mysql-primary')): true
+---
+apiVersion: core.openeverest.io/v1alpha1
+kind: Instance
+metadata:
+  name: ps-issuer
+status:
+  (length(pendingMaintenance || `[]`)): 0

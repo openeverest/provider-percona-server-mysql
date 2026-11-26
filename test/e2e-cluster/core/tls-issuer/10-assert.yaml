@@ -1,0 +1,15 @@
+apiVersion: ps.percona.com/v1
+kind: PerconaServerMySQL
+metadata:
+  name: ps-issuer
+spec:
+  sslSecretName: ps-issuer-ssl
+  tls:
+    issuerConf:
+      name: company-ca
+      kind: Issuer
+      group: cert-manager.io
+    SANs:
+      - db.example.com
+  mysql:
+    (contains(configuration, 'require_secure_transport=ON')): true
